@@ -5,6 +5,7 @@ import {
   finalizeRedemptionForOrder,
   redeemReferralCode,
 } from "../lib/ledger.server";
+import { log } from "../lib/logger.server";
 
 /**
  * Awards ledger points when an order is paid. Also finalizes any point
@@ -21,10 +22,10 @@ import {
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop, session, admin, payload, topic } = await authenticate.webhook(request);
-  console.log(`Received ${topic} webhook for ${shop}`);
+  log("info", "webhook.received", { topic, shop });
 
   if (!session || !admin) {
-    console.warn(`Skipping ${topic} for ${shop}: missing session or admin client`);
+    log("warn", "webhook.skipped_no_session", { topic, shop });
     return new Response();
   }
 
@@ -33,9 +34,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const subtotal = Number(payload.current_subtotal_price ?? payload.subtotal_price ?? 0);
 
   if (!orderId || !customer?.id) {
-    console.warn(
-      `Skipping ${topic} for ${shop}: orderId=${orderId || "(none)"} customer=${customer?.id ?? "(none)"}`,
-    );
+    log("warn", "webhook.orders_paid.skipped", {
+      shop,
+      orderId: orderId || null,
+      customerId: customer?.id ?? null,
+    });
     return new Response();
   }
 
@@ -53,9 +56,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   let pointsRedeemed = Number(attributeValue("points_to_redeem") ?? 0);
   let referralCode: string | null = attributeValue("referral_code");
-  console.log(
-    `Order ${orderId} loyalty attributes: points_to_redeem=${pointsRedeemed} referral=${referralCode ?? "(none)"} note_attributes=${JSON.stringify(noteAttributes)}`,
-  );
+  log("info", "webhook.orders_paid.attributes", {
+    shop,
+    orderId,
+    pointsRedeemed,
+    referralCode,
+  });
 
   try {
     const response = await admin.graphql(
@@ -73,7 +79,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (metafieldPoints > 0) pointsRedeemed = metafieldPoints;
     referralCode = json?.data?.order?.referralCode?.value ?? referralCode;
   } catch (error) {
-    console.error("Failed to fetch order loyalty metafields", error);
+    log("error", "webhook.orders_paid.metafields_failed", { shop, orderId, error });
   }
 
   if (pointsRedeemed > 0) {

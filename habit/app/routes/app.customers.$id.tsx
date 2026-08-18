@@ -4,6 +4,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { syncCustomersFromShopify } from "../lib/loyalty.server";
+import { log } from "../lib/logger.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
@@ -18,7 +19,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
     await syncCustomersFromShopify(session.shop, admin, [existing.shopifyCustomerId]);
   } catch (error) {
-    console.warn("Could not sync member profile from Shopify", error);
+    log("warn", "loyalty.member_sync_failed", { shop: session.shop, error });
   }
 
   const customer = await db.customer.findFirst({

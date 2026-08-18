@@ -113,6 +113,9 @@ model Customer {
   pointsBalance     Int      @default(0)
   vipTierId         String?
   vipTier           VipTier? @relation(fields: [vipTierId], references: [id])
+  // Set when a customers/redact webhook scrubs this member's PII. Ledger
+  // rows stay for merchant accounting; email and displayName are cleared.
+  redactedAt        DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -183,4 +186,19 @@ model ReferralCode {
   @@index([ownerId])
   // Supports the "alert on abnormal code-creation volume" fraud check.
   @@index([shop, createdAt])
+}
+
+model PrivacyRequest {
+  id                String   @id @default(uuid())
+  shop              String
+  type              String
+  shopifyCustomerId String?
+  payload           Json
+  exportData        Json?
+  status            String   @default("received")
+  createdAt         DateTime @default(now())
+  fulfilledAt       DateTime?
+
+  @@index([shop])
+  @@index([shop, shopifyCustomerId])
 }

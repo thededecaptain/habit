@@ -10,7 +10,7 @@ export const meta: MetaFunction = () => [
   { title: "Habit" },
   {
     name: "description",
-    content: "Loyalty that rewards how customers actually buy.",
+    content: "Loyalty that rewards repeat buyers with points, VIP tiers, and referrals.",
   },
 ];
 
@@ -47,10 +47,10 @@ export default function App() {
     <div className={styles.index}>
       <div className={styles.content}>
         <p className={styles.brand}>Habit</p>
-        <h1 className={styles.heading}>Loyalty that rewards how customers actually buy</h1>
+        <h1 className={styles.heading}>Loyalty with points, VIP tiers, and referrals</h1>
         <p className={styles.text}>
-          Points, VIP tiers, and referrals in one program — built around purchase
-          cadence, not just order count.
+          Points, VIP tiers, and referrals in one program — flat monthly pricing, no order-count
+          cliff.
         </p>
         {showForm && (
           <Form className={styles.form} method="post" action="/auth/login">
@@ -83,6 +83,11 @@ export default function App() {
             app or extra fee.
           </li>
         </ul>
+        <p className={styles.text}>
+          <a href="/privacy">Privacy</a>
+          {" · "}
+          <a href="/support">Support</a>
+        </p>
       </div>
     </div>
   );

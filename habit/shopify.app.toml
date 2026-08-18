@@ -5,6 +5,12 @@ name = "Habit"
 application_url = "https://habit-production-9257.up.railway.app/app"
 embedded = true
 
+# Listing URLs for the Shopify Partner Dashboard:
+# Privacy policy: https://habit-production-9257.up.railway.app/privacy
+# Support: https://habit-production-9257.up.railway.app/support
+# Before App Store review, request Protected customer data access
+# (email + name) in Partner Dashboard > API access.
+
 [build]
 automatically_update_urls_on_dev = false
 

@@ -1,6 +1,10 @@
 import type { Customer, ShopSettings, VipTier } from "@prisma/client";
 import prisma from "../db.server";
 import { getOrCreateCustomer, getOrCreateShopSettings, resolveVipTier } from "./ledger.server";
+import { log } from "./logger.server";
+import { nextTierProgress } from "./loyalty.math";
+
+export { nextTierProgress, ratesPayload } from "./loyalty.math";
 
 type AdminClient = {
   graphql: (
@@ -40,46 +44,6 @@ type ShopifyProfile = {
   amountSpent: number;
   numberOfOrders: number;
 };
-
-export function nextTierProgress(
-  tiers: VipTier[],
-  current: VipTier | null | undefined,
-  lifetimeSpend: number,
-  lifetimeOrders: number,
-) {
-  const next = [...tiers]
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .find((tier) => !current || tier.sortOrder > current.sortOrder);
-
-  if (!next) {
-    return {
-      nextTierName: null as string | null,
-      nextTierRemainingSpend: null as number | null,
-      nextTierRemainingOrders: null as number | null,
-    };
-  }
-
-  const remainingSpend =
-    next.minSpend != null ? Math.max(0, Number(next.minSpend) - lifetimeSpend) : null;
-  const remainingOrders =
-    next.minOrders != null ? Math.max(0, next.minOrders - lifetimeOrders) : null;
-
-  return {
-    nextTierName: next.name,
-    nextTierRemainingSpend: remainingSpend,
-    nextTierRemainingOrders: remainingOrders,
-  };
-}
-
-export function ratesPayload(settings: ShopSettings) {
-  return {
-    loggedIn: false as const,
-    pointsPerDollar: Number(settings.pointsPerDollar),
-    redemptionRate: Number(settings.redemptionRate),
-    minRedeemablePoints: settings.minRedeemablePoints,
-    maxRedemptionPercent: Number(settings.maxRedemptionPercent),
-  };
-}
 
 function displayNameFrom(firstName?: string | null, lastName?: string | null) {
   const name = [firstName, lastName].filter(Boolean).join(" ").trim();
@@ -200,7 +164,7 @@ export async function getLoyaltySnapshot(
       try {
         await syncCustomersFromShopify(shop, options.admin, [shopifyCustomerId]);
       } catch (error) {
-        console.warn("Could not sync customer from Shopify", error);
+        log("warn", "loyalty.customer_sync_failed", { shop, shopifyCustomerId, error });
       }
     }
   }

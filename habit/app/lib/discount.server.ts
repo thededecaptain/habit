@@ -1,6 +1,7 @@
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
 import type { ShopSettings } from "@prisma/client";
 import db from "../db.server";
+import { log } from "./logger.server";
 
 const REDEMPTION_FUNCTION_HANDLE = "points-redemption";
 
@@ -46,7 +47,7 @@ export async function syncLoyaltySettingsMetafield(
     },
   );
 
-  console.log(`Synced loyalty_settings metafield for ${shop}`);
+  log("info", "discount.settings_synced", { shop });
 }
 
 /**
@@ -87,7 +88,7 @@ export async function ensureRedemptionDiscount(admin: AdminApiContext, shop: str
     const result = json?.data?.discountAutomaticAppCreate;
     const errors = result?.userErrors ?? [];
     if (errors.length > 0) {
-      console.error("discountAutomaticAppCreate userErrors", errors);
+      log("error", "discount.create_user_errors", { shop, errors });
       return null;
     }
 
@@ -100,7 +101,7 @@ export async function ensureRedemptionDiscount(admin: AdminApiContext, shop: str
     }
     return discountId ?? null;
   } catch (error) {
-    console.error("Failed to create redemption discount", error);
+    log("error", "discount.create_failed", { shop, error });
     return null;
   }
 }

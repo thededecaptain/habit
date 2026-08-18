@@ -1,34 +1,63 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Outlet, useLoaderData, useRouteError } from "react-router";
+import { Outlet, useLoaderData, useLocation, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
-import { authenticate } from "../shopify.server";
+import { authenticate, MONTHLY_PLAN } from "../shopify.server";
+import { isBillingTest } from "../lib/billing";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const { billing, redirect } = await authenticate.admin(request);
+  const { hasActivePayment } = await billing.check({
+    plans: [MONTHLY_PLAN],
+    isTest: isBillingTest(),
+  });
 
-  // eslint-disable-next-line no-undef
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  const path = new URL(request.url).pathname;
+  const allowUnpaid =
+    path === "/app/plan" ||
+    path.startsWith("/app/plan/") ||
+    path === "/app/settings" ||
+    path.startsWith("/app/privacy/");
+  if (!hasActivePayment && !allowUnpaid) {
+    throw redirect("/app/plan");
+  }
+
+  return {
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    hasActivePayment,
+  };
 };
 
 export default function App() {
-  const { apiKey } = useLoaderData<typeof loader>();
+  const { apiKey, hasActivePayment } = useLoaderData<typeof loader>();
+  const location = useLocation();
+  const onPlanPage = location.pathname === "/app/plan" || location.pathname.startsWith("/app/plan/");
 
   return (
     <AppProvider embedded apiKey={apiKey}>
-      <s-app-nav>
-        <s-link href="/app">Home</s-link>
-        <s-link href="/app/customers">Members</s-link>
-        <s-link href="/app/tiers">VIP tiers</s-link>
-        <s-link href="/app/settings">Settings</s-link>
-      </s-app-nav>
+      {onPlanPage ? null : (
+        <s-app-nav>
+          {hasActivePayment ? (
+            <>
+              <s-link href="/app">Home</s-link>
+              <s-link href="/app/customers">Members</s-link>
+              <s-link href="/app/tiers">VIP tiers</s-link>
+              <s-link href="/app/settings">Settings</s-link>
+            </>
+          ) : (
+            <>
+              <s-link href="/app/plan">Plan</s-link>
+              <s-link href="/app/settings">Settings</s-link>
+            </>
+          )}
+        </s-app-nav>
+      )}
       <Outlet />
     </AppProvider>
   );
 }
 
-// Shopify needs React Router to catch some thrown responses, so that their headers are included in the response.
 export function ErrorBoundary() {
   return boundary.error(useRouteError());
 }
