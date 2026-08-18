@@ -1,0 +1,12 @@
+.git
+.cursor
+.DS_Store
+**/.env
+**/.env.*
+**/node_modules
+**/.cache
+**/build
+**/.react-router
+habit/.shopify
+docs
+README.md
