@@ -14,11 +14,14 @@ const DEFAULT_SETTINGS = {
 } as const;
 
 export async function getOrCreateShopSettings(shop: string): Promise<ShopSettings> {
-  return prisma.shopSettings.upsert({
-    where: { shop },
-    update: {},
-    create: { shop, ...DEFAULT_SETTINGS },
-  });
+  const existing = await prisma.shopSettings.findUnique({ where: { shop } });
+  if (existing) return existing;
+
+  try {
+    return await prisma.shopSettings.create({ data: { shop, ...DEFAULT_SETTINGS } });
+  } catch {
+    return prisma.shopSettings.findUniqueOrThrow({ where: { shop } });
+  }
 }
 
 export async function getOrCreateCustomer(

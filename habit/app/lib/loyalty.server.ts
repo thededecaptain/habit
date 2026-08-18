@@ -189,11 +189,19 @@ export async function getLoyaltySnapshot(
   shopifyCustomerId: string,
   options?: { admin?: AdminClient; includeHistory?: boolean },
 ): Promise<LoyaltyCard> {
+  // Only hit Admin GraphQL when we still need a name/email. Storefront and
+  // checkout call this on every view — those must stay database-only.
   if (options?.admin) {
-    try {
-      await syncCustomersFromShopify(shop, options.admin, [shopifyCustomerId]);
-    } catch (error) {
-      console.warn("Could not sync customer from Shopify", error);
+    const existing = await prisma.customer.findUnique({
+      where: { shop_shopifyCustomerId: { shop, shopifyCustomerId } },
+      select: { email: true, displayName: true },
+    });
+    if (!existing?.email || !existing?.displayName) {
+      try {
+        await syncCustomersFromShopify(shop, options.admin, [shopifyCustomerId]);
+      } catch (error) {
+        console.warn("Could not sync customer from Shopify", error);
+      }
     }
   }
 

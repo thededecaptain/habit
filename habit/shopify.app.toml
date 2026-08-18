@@ -1,8 +1,8 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "3acb5c90ed6b779288c26dee2a0bf291"
-name = "habit"
-application_url = "https://habit-production-9257.up.railway.app"
+client_id = "d4f4bcdc36a90b4443c2e6fde31bbd80"
+name = "Habit"
+application_url = "https://habit-production-9257.up.railway.app/app"
 embedded = true
 
 [build]

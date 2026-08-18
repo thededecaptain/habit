@@ -8,15 +8,34 @@
   padding: 1rem;
 }
 
+.brand {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #616161;
+}
+
 .heading,
 .text {
   padding: 0;
   margin: 0;
 }
 
+.heading {
+  font-size: 2rem;
+  line-height: 1.25;
+  max-width: 36rem;
+  justify-self: center;
+}
+
 .text {
-  font-size: 1.2rem;
-  padding-bottom: 2rem;
+  font-size: 1.15rem;
+  line-height: 1.5;
+  max-width: 36rem;
+  justify-self: center;
+  color: #303030;
 }
 
 .content {
@@ -26,8 +45,8 @@
 
 .form {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  align-items: flex-end;
+  justify-content: center;
   margin: 0 auto;
   gap: 1rem;
 }
@@ -45,13 +64,13 @@
 }
 
 .button {
-  padding: 0.4rem;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
 }
 
 .list {
   list-style: none;
   padding: 0;
-  padding-top: 3rem;
   margin: 0;
   display: flex;
   gap: 2rem;

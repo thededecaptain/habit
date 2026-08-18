@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { authenticate, unauthenticated } from "../shopify.server";
+import { authenticate } from "../shopify.server";
 import { getOrCreateShopSettings } from "../lib/ledger.server";
 import { getLoyaltySnapshot, ratesPayload } from "../lib/loyalty.server";
 
@@ -23,12 +23,5 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return Response.json(rates);
   }
 
-  let admin: Awaited<ReturnType<typeof unauthenticated.admin>>["admin"] | undefined;
-  try {
-    admin = (await unauthenticated.admin(session.shop)).admin;
-  } catch {
-    admin = undefined;
-  }
-
-  return Response.json(await getLoyaltySnapshot(session.shop, customerId, { admin }));
+  return Response.json(await getLoyaltySnapshot(session.shop, customerId));
 };

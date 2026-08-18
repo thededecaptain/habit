@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { authenticate, unauthenticated } from "../shopify.server";
+import { authenticate } from "../shopify.server";
 import { createReferralCode, ReferralError } from "../lib/ledger.server";
 import { getLoyaltySnapshot } from "../lib/loyalty.server";
 
@@ -17,13 +17,7 @@ function customerIdFromToken(sub: string | undefined) {
 }
 
 async function snapshot(shop: string, shopifyCustomerId: string) {
-  let admin: Awaited<ReturnType<typeof unauthenticated.admin>>["admin"] | undefined;
-  try {
-    admin = (await unauthenticated.admin(shop)).admin;
-  } catch {
-    admin = undefined;
-  }
-  return getLoyaltySnapshot(shop, shopifyCustomerId, { admin, includeHistory: true });
+  return getLoyaltySnapshot(shop, shopifyCustomerId, { includeHistory: true });
 }
 
 /**

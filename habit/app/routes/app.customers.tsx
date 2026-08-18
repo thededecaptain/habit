@@ -6,42 +6,13 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { PointTransactionType } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
-import { syncCustomersFromShopify } from "../lib/loyalty.server";
 
 const ADJUST_MODAL_ID = "adjust-points-modal";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.trim() ?? "";
-
-  const existing = await db.customer.findMany({
-    where: {
-      shop: session.shop,
-      ...(q
-        ? {
-            OR: [
-              { email: { contains: q, mode: "insensitive" } },
-              { displayName: { contains: q, mode: "insensitive" } },
-              { shopifyCustomerId: { contains: q } },
-            ],
-          }
-        : {}),
-    },
-    select: { shopifyCustomerId: true },
-    take: 50,
-    orderBy: { updatedAt: "desc" },
-  });
-
-  try {
-    await syncCustomersFromShopify(
-      session.shop,
-      admin,
-      existing.map((row) => row.shopifyCustomerId),
-    );
-  } catch (error) {
-    console.warn("Could not sync member profiles from Shopify", error);
-  }
 
   const customers = await db.customer.findMany({
     where: {
