@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
+import type { Prisma } from "@prisma/client";
 import { authenticate } from "../shopify.server";
-import db from "../db.server";
+import { redactCustomerData } from "../lib/privacy.server";
 
 /**
  * GDPR mandatory webhook: erase a customer's personal data 10 days after a
@@ -8,20 +9,15 @@ import db from "../db.server";
  * rows (for the merchant's own accounting/fraud history) but scrub PII.
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, payload, topic } = await authenticate.webhook(request);
-  console.log(`Received ${topic} webhook for ${shop}`);
-
-  const shopifyCustomerId = String(payload.customer?.id ?? "");
+  const { shop, payload } = await authenticate.webhook(request);
+  const customer = payload.customer as { id?: string | number } | undefined;
+  const shopifyCustomerId = String(customer?.id ?? "");
   if (!shopifyCustomerId) return new Response();
 
-  const customer = await db.customer.findUnique({
-    where: { shop_shopifyCustomerId: { shop, shopifyCustomerId } },
-  });
-  if (!customer) return new Response();
-
-  await db.customer.update({
-    where: { id: customer.id },
-    data: { email: null },
+  await redactCustomerData({
+    shop,
+    shopifyCustomerId,
+    payload: payload as Prisma.InputJsonValue,
   });
 
   return new Response();

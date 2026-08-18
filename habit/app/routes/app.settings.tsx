@@ -3,10 +3,11 @@ import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "re
 import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
-import { authenticate } from "../shopify.server";
+import { authenticate, MONTHLY_PLAN } from "../shopify.server";
 import db from "../db.server";
 import { getOrCreateShopSettings } from "../lib/ledger.server";
 import { ensureRedemptionDiscount, syncLoyaltySettingsMetafield } from "../lib/discount.server";
+import { isBillingTest } from "../lib/billing";
 
 const SAVE_BAR_ID = "settings-save-bar";
 
@@ -22,8 +23,12 @@ type FormState = {
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
   const settings = await getOrCreateShopSettings(session.shop);
+  const { hasActivePayment, appSubscriptions } = await billing.check({
+    plans: [MONTHLY_PLAN],
+    isTest: isBillingTest(),
+  });
 
   const values: FormState = {
     pointsPerDollar: String(settings.pointsPerDollar),
@@ -36,7 +41,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     maxActiveReferralCodesPerCustomer: String(settings.maxActiveReferralCodesPerCustomer),
   };
 
-  return { values };
+  const privacyRequests = await db.privacyRequest.findMany({
+    where: { shop: session.shop },
+    orderBy: { createdAt: "desc" },
+    take: 25,
+    select: {
+      id: true,
+      type: true,
+      shopifyCustomerId: true,
+      status: true,
+      createdAt: true,
+      exportData: true,
+    },
+  });
+
+  return {
+    values,
+    billing: {
+      hasActivePayment,
+      planName: appSubscriptions[0]?.name ?? MONTHLY_PLAN,
+      subscriptionId: appSubscriptions[0]?.id ?? null,
+    },
+    privacyRequests: privacyRequests.map((row) => ({
+      id: row.id,
+      type: row.type,
+      shopifyCustomerId: row.shopifyCustomerId,
+      status: row.status,
+      createdAt: row.createdAt.toISOString(),
+      hasExport: row.exportData != null,
+    })),
+  };
 };
 
 function parsePositiveNumber(value: FormDataEntryValue | null, label: string) {
@@ -56,8 +90,24 @@ function parsePositiveInt(value: FormDataEntryValue | null, label: string) {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session, admin } = await authenticate.admin(request);
+  const { session, admin, billing, redirect } = await authenticate.admin(request);
   const formData = await request.formData();
+
+  if (formData.get("intent") === "cancel-subscription") {
+    const { appSubscriptions } = await billing.check({
+      plans: [MONTHLY_PLAN],
+      isTest: isBillingTest(),
+    });
+    const subscription = appSubscriptions[0];
+    if (subscription) {
+      await billing.cancel({
+        subscriptionId: subscription.id,
+        isTest: isBillingTest(),
+        prorate: true,
+      });
+    }
+    throw redirect("/app/plan");
+  }
 
   const fields = {
     pointsPerDollar: parsePositiveNumber(formData.get("pointsPerDollar"), "Points per dollar"),
@@ -123,7 +173,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Settings() {
-  const { values } = useLoaderData<typeof loader>();
+  const { values, billing, privacyRequests } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
 
@@ -311,6 +361,78 @@ export default function Settings() {
             step={1}
             details="Basic fraud protection: caps how many unused codes a member can generate."
           />
+        </s-stack>
+      </s-section>
+
+      <s-section heading="Billing">
+        <s-stack direction="block" gap="base">
+          {billing.hasActivePayment ? (
+            <>
+              <s-paragraph>
+                Current plan: <s-text type="strong">{billing.planName}</s-text>. Canceling stops
+                future Shopify charges immediately (unused time is prorated). The app stays
+                installed until you uninstall it from Shopify; you can resubscribe anytime.
+              </s-paragraph>
+              <s-button
+                tone="critical"
+                variant="secondary"
+                onClick={() =>
+                  fetcher.submit({ intent: "cancel-subscription" }, { method: "POST" })
+                }
+              >
+                Cancel subscription
+              </s-button>
+            </>
+          ) : (
+            <s-paragraph>
+              No active subscription.{" "}
+              <s-link href="/app/plan">Start the Habit monthly plan</s-link>.
+            </s-paragraph>
+          )}
+        </s-stack>
+      </s-section>
+
+      <s-section heading="Privacy requests">
+        <s-stack direction="block" gap="base">
+          <s-paragraph>
+            GDPR customer data requests are saved here so you can download the export and send
+            it to the customer.{" "}
+            <s-link href="/privacy" target="_blank">
+              Privacy policy
+            </s-link>
+          </s-paragraph>
+          {privacyRequests.length === 0 ? (
+            <s-paragraph color="subdued">No privacy webhooks received yet.</s-paragraph>
+          ) : (
+            <s-table variant="auto">
+              <s-table-header-row>
+                <s-table-header>Type</s-table-header>
+                <s-table-header>Customer</s-table-header>
+                <s-table-header>Status</s-table-header>
+                <s-table-header>Received</s-table-header>
+                <s-table-header>Export</s-table-header>
+              </s-table-header-row>
+              <s-table-body>
+                {privacyRequests.map((row) => (
+                  <s-table-row key={row.id}>
+                    <s-table-cell>{row.type}</s-table-cell>
+                    <s-table-cell>{row.shopifyCustomerId ?? "—"}</s-table-cell>
+                    <s-table-cell>{row.status}</s-table-cell>
+                    <s-table-cell>{new Date(row.createdAt).toLocaleString()}</s-table-cell>
+                    <s-table-cell>
+                      {row.hasExport ? (
+                        <s-link href={`/app/privacy/${row.id}`} target="_blank">
+                          Download JSON
+                        </s-link>
+                      ) : (
+                        "—"
+                      )}
+                    </s-table-cell>
+                  </s-table-row>
+                ))}
+              </s-table-body>
+            </s-table>
+          )}
         </s-stack>
       </s-section>
 

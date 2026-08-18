@@ -2,11 +2,20 @@ import "@shopify/shopify-app-react-router/adapters/node";
 import {
   ApiVersion,
   AppDistribution,
+  BillingInterval,
   shopifyApp,
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 import { bootstrapShop } from "./lib/discount.server";
+import {
+  MONTHLY_PLAN,
+  MONTHLY_PLAN_AMOUNT,
+  MONTHLY_PLAN_CURRENCY,
+} from "./lib/billing";
+import { initSentry } from "./lib/logger.server";
+
+initSentry();
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -17,11 +26,24 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
+  billing: {
+    [MONTHLY_PLAN]: {
+      lineItems: [
+        {
+          amount: MONTHLY_PLAN_AMOUNT,
+          currencyCode: MONTHLY_PLAN_CURRENCY,
+          interval: BillingInterval.Every30Days,
+        },
+      ],
+    },
+  },
   hooks: {
     afterAuth: async ({ session, admin }) => {
       // Seed default settings, sync the loyalty metafield, and create the
       // Function-powered redemption discount so the app works immediately
       // after install without requiring a trip to the Settings page.
+      // Billing is requested on the next admin load (including reinstalls)
+      // via the /app layout so a declined charge can be retried.
       await bootstrapShop(admin, session.shop);
     },
   },
@@ -41,3 +63,4 @@ export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;
 export const registerWebhooks = shopify.registerWebhooks;
 export const sessionStorage = shopify.sessionStorage;
+export { MONTHLY_PLAN };

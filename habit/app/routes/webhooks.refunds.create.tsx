@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { reverseForRefund } from "../lib/ledger.server";
+import { log } from "../lib/logger.server";
 
 /**
  * Automatic refund clawback: reverses the proportional share of points
@@ -9,7 +10,7 @@ import { reverseForRefund } from "../lib/ledger.server";
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop, session, admin, payload, topic } = await authenticate.webhook(request);
-  console.log(`Received ${topic} webhook for ${shop}`);
+  log("info", "webhook.received", { topic, shop });
 
   if (!session || !admin) return new Response();
 
@@ -43,7 +44,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const json = await response.json();
     orderSubtotal = Number(json?.data?.order?.subtotalPriceSet?.shopMoney?.amount ?? 0);
   } catch (error) {
-    console.error("Failed to fetch order subtotal for refund clawback", error);
+    log("error", "webhook.refunds_create.subtotal_failed", { shop, orderId, error });
   }
 
   await reverseForRefund({ shop, orderId, refundedAmount, orderSubtotal });

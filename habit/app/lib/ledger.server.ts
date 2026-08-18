@@ -1,6 +1,16 @@
 import { PointTransactionType, ReferralCodeStatus } from "@prisma/client";
-import type { Customer, ShopSettings, VipTier } from "@prisma/client";
+import type { Customer, ShopSettings } from "@prisma/client";
 import prisma from "../db.server";
+import { log } from "./logger.server";
+import {
+  calculateEarnPoints,
+  calculateRefundReversalPoints,
+  clampRedemption,
+  generateReferralCode,
+  resolveVipTier,
+} from "./ledger.math";
+
+export { resolveVipTier } from "./ledger.math";
 
 const DEFAULT_SETTINGS = {
   pointsPerDollar: 1,
@@ -41,24 +51,6 @@ export async function getOrCreateCustomer(
 }
 
 /**
- * Picks the highest-sorted VIP tier the customer's lifetime totals qualify
- * for. Tiers with a null threshold on a given axis are ignored on that axis.
- */
-export function resolveVipTier(
-  tiers: VipTier[],
-  lifetimeSpend: number,
-  lifetimeOrders: number,
-): VipTier | null {
-  const qualifying = tiers.filter((tier) => {
-    const spendOk = tier.minSpend == null || lifetimeSpend >= Number(tier.minSpend);
-    const ordersOk = tier.minOrders == null || lifetimeOrders >= tier.minOrders;
-    return spendOk && ordersOk;
-  });
-  if (qualifying.length === 0) return null;
-  return qualifying.sort((a, b) => b.sortOrder - a.sortOrder)[0]!;
-}
-
-/**
  * Awards points for a paid order. Idempotent per orderId: if points were
  * already awarded for this order, does nothing (Shopify may redeliver
  * webhooks).
@@ -87,7 +79,11 @@ export async function awardPointsForOrder(params: {
     ? tiers.find((t) => t.id === customer.vipTierId) ?? null
     : resolveVipTier(tiers, Number(customer.lifetimeSpend), customer.lifetimeOrders);
   const multiplier = currentTier ? Number(currentTier.earnMultiplier) : 1;
-  const points = Math.floor(subtotalAmount * Number(settings.pointsPerDollar) * multiplier);
+  const points = calculateEarnPoints(
+    subtotalAmount,
+    Number(settings.pointsPerDollar),
+    multiplier,
+  );
 
   const lifetimeSpend = Number(customer.lifetimeSpend) + subtotalAmount;
   const lifetimeOrders = customer.lifetimeOrders + 1;
@@ -157,13 +153,12 @@ export async function reverseForRefund(params: {
     _sum: { points: true },
   });
   const alreadyReversedPoints = Math.abs(alreadyReversed._sum.points ?? 0);
-
-  const proportion = orderSubtotal > 0 ? Math.min(refundedAmount / orderSubtotal, 1) : 1;
-  const targetReversal = Math.floor(earnTx.points * proportion);
-  const pointsToReverse = Math.min(
-    targetReversal - alreadyReversedPoints,
-    earnTx.points - alreadyReversedPoints,
-  );
+  const pointsToReverse = calculateRefundReversalPoints({
+    earnedPoints: earnTx.points,
+    alreadyReversedPoints,
+    refundedAmount,
+    orderSubtotal,
+  });
 
   if (pointsToReverse <= 0) return null;
 
@@ -241,11 +236,14 @@ export async function finalizeRedemptionForOrder(params: {
   if (existing) return existing;
 
   const customer = await getOrCreateCustomer(shop, shopifyCustomerId);
-  const pointsToDeduct = Math.min(points, Math.max(customer.pointsBalance, 0));
+  const pointsToDeduct = clampRedemption(points, customer.pointsBalance);
   if (pointsToDeduct < points) {
-    console.warn(
-      `Redemption overdraft on order ${orderId} for shop ${shop}: requested ${points}, balance ${customer.pointsBalance}`,
-    );
+    log("warn", "ledger.redemption_overdraft", {
+      shop,
+      orderId,
+      requested: points,
+      balance: customer.pointsBalance,
+    });
   }
   if (pointsToDeduct <= 0) return null;
 
@@ -269,15 +267,6 @@ export async function finalizeRedemptionForOrder(params: {
   return transaction;
 }
 
-function generateCode(length = 8) {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars
-  let code = "";
-  for (let i = 0; i < length; i++) {
-    code += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  return code;
-}
-
 export class ReferralError extends Error {}
 
 /**
@@ -297,14 +286,21 @@ export async function createReferralCode(shop: string, shopifyCustomerId: string
     );
   }
 
+  const recentHourCount = await prisma.referralCode.count({
+    where: { shop, createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) } },
+  });
+  if (recentHourCount >= 50) {
+    log("warn", "ledger.referral_volume_alert", { shop, recentHourCount });
+  }
+
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + settings.referralCodeExpiryDays);
 
-  let code = generateCode();
+  let code = generateReferralCode();
   for (let attempts = 0; attempts < 5; attempts++) {
     const collision = await prisma.referralCode.findUnique({ where: { code } });
     if (!collision) break;
-    code = generateCode();
+    code = generateReferralCode();
   }
 
   return prisma.referralCode.create({

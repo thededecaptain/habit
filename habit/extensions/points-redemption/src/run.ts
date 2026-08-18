@@ -1,14 +1,10 @@
 import type { RunInput, FunctionRunResult } from "../generated/api";
 import { DiscountApplicationStrategy } from "../generated/api";
+import { computeDiscountAmount, parseLoyaltySettings, pointsToRedeem } from "./discount";
 
 const EMPTY_DISCOUNT: FunctionRunResult = {
   discountApplicationStrategy: DiscountApplicationStrategy.First,
   discounts: [],
-};
-
-type LoyaltySettings = {
-  redemptionRate: number;
-  maxRedemptionPercent: number;
 };
 
 /**
@@ -29,32 +25,21 @@ type LoyaltySettings = {
  * the cart attribute/metafield client-side.
  */
 export function run(input: RunInput): FunctionRunResult {
-  const fromMetafield = Number(input.cart.pointsMetafield?.value ?? 0);
-  const fromAttribute = Number(input.cart.pointsAttribute?.value ?? 0);
-  const pointsToRedeem = fromMetafield > 0 ? fromMetafield : fromAttribute;
-  if (!pointsToRedeem || pointsToRedeem <= 0) {
+  const points = pointsToRedeem(
+    Number(input.cart.pointsMetafield?.value ?? 0),
+    Number(input.cart.pointsAttribute?.value ?? 0),
+  );
+  const settings = parseLoyaltySettings(input.shop.metafield?.value);
+  if (!points || !settings) {
     return EMPTY_DISCOUNT;
   }
 
-  let settings: LoyaltySettings;
-  try {
-    settings = JSON.parse(input.shop.metafield?.value ?? "{}");
-  } catch {
-    return EMPTY_DISCOUNT;
-  }
-
-  const redemptionRate = Number(settings.redemptionRate);
-  const maxRedemptionPercent = Number(settings.maxRedemptionPercent);
-  if (!redemptionRate || redemptionRate <= 0) {
-    return EMPTY_DISCOUNT;
-  }
-
-  const subtotal = Number(input.cart.cost.subtotalAmount.amount);
-  const requestedDiscount = pointsToRedeem / redemptionRate;
-  const maxDiscount = maxRedemptionPercent
-    ? subtotal * (maxRedemptionPercent / 100)
-    : requestedDiscount;
-  const discountAmount = Math.min(requestedDiscount, maxDiscount, subtotal);
+  const discountAmount = computeDiscountAmount({
+    points,
+    redemptionRate: settings.redemptionRate,
+    maxRedemptionPercent: settings.maxRedemptionPercent,
+    subtotal: Number(input.cart.cost.subtotalAmount.amount),
+  });
 
   if (discountAmount <= 0) {
     return EMPTY_DISCOUNT;

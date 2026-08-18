@@ -5,3 +5,5 @@ dockerfilePath = "Dockerfile"
 [deploy]
 startCommand = "npm run docker-start"
 restartPolicyType = "ON_FAILURE"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
