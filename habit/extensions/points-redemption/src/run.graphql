@@ -1,0 +1,27 @@
+query RunInput {
+  cart {
+    # Set by the redeem-points checkout UI extension (Shopify Plus only —
+    # checkout UI extensions on the information/shipping/payment steps
+    # require Plus). Preferred when present, since it reflects the buyer's
+    # most recent edit right up to payment.
+    pointsMetafield: metafield(namespace: "$app", key: "points_to_redeem") {
+      value
+    }
+    # Set by the cart-page "Redeem points" theme app block via the classic
+    # Ajax Cart API (`/cart/update.js`), which works on every plan. This is
+    # the primary path for the vast majority of (non-Plus) merchants.
+    pointsAttribute: attribute(key: "points_to_redeem") {
+      value
+    }
+    cost {
+      subtotalAmount {
+        amount
+      }
+    }
+  }
+  shop {
+    metafield(key: "loyalty_settings") {
+      value
+    }
+  }
+}

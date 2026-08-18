@@ -1,0 +1,78 @@
+{{ 'points-widget.css' | asset_url | stylesheet_tag }}
+
+<div
+  class="habit-widget"
+  data-habit-widget
+  data-proxy-url="/apps/habit"
+  data-product-price-cents="{% if product %}{{ product.selected_or_first_available_variant.price | default: product.price }}{% else %}0{% endif %}"
+  style="
+    {% if block.settings.accent_color != blank and block.settings.accent_color != '#121212' %}--habit-accent: {{ block.settings.accent_color }};{% endif %}
+    --habit-radius: {{ block.settings.corner_radius }}px;
+  "
+  {{ block.shopify_attributes }}
+>
+  <div data-habit-loading class="habit-widget__state">
+    <p>{{ block.settings.loading_text | default: 'Loading your rewards…' }}</p>
+  </div>
+
+  <div data-habit-loggedin class="habit-widget__state" hidden>
+    <p class="habit-widget__eyebrow">{{ block.settings.heading | default: 'Your rewards' }}</p>
+    <p class="habit-widget__balance">
+      <span data-habit-balance>0</span>
+      <span class="habit-widget__balance-label">points</span>
+      <span class="habit-widget__value" data-habit-value hidden></span>
+    </p>
+    <p class="habit-widget__context" data-habit-context hidden></p>
+    <p class="habit-widget__tier" data-habit-tier hidden></p>
+    <p class="habit-widget__next-tier" data-habit-next-tier hidden></p>
+    <a class="habit-widget__cta" data-habit-cart-link href="{{ routes.cart_url }}">
+      {{ block.settings.redeem_hint | default: 'Redeem in cart' }}
+    </a>
+
+    <details class="habit-widget__referral">
+      <summary>{{ block.settings.referral_summary | default: 'Share with friends' }}</summary>
+      <p class="habit-widget__next-tier">
+        {{ block.settings.referral_text | default: 'Give friends your code. They get a bonus on their first order, and so do you.' }}
+      </p>
+      <div class="habit-widget__referral-row">
+        <code data-habit-referral-code>—</code>
+        <button type="button" data-habit-get-code class="habit-widget__button habit-widget__button--inline">
+          {{ block.settings.get_code_text | default: 'Get my code' }}
+        </button>
+        <button type="button" data-habit-copy-code class="habit-widget__button habit-widget__button--inline" hidden>
+          {{ block.settings.copy_text | default: 'Copy code' }}
+        </button>
+      </div>
+      <p class="habit-widget__status" data-habit-referral-status role="status"></p>
+    </details>
+  </div>
+
+  <div data-habit-guest class="habit-widget__state" hidden>
+    <p class="habit-widget__eyebrow">{{ block.settings.heading | default: 'Your rewards' }}</p>
+    <p class="habit-widget__context" data-habit-guest-context></p>
+    <p>
+      <a href="{{ routes.account_login_url }}">{{ block.settings.login_link_text | default: 'Log in to see your balance' }}</a>
+    </p>
+  </div>
+</div>
+
+<script src="{{ 'points-widget.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Loyalty points",
+  "target": "section",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Your rewards" },
+    { "type": "text", "id": "loading_text", "label": "Loading text", "default": "Loading your rewards…" },
+    { "type": "text", "id": "redeem_hint", "label": "Redeem link text", "default": "Redeem in cart" },
+    { "type": "text", "id": "referral_summary", "label": "Referral row label", "default": "Share with friends" },
+    { "type": "text", "id": "referral_text", "label": "Referral prompt", "default": "Give friends your code. They get a bonus on their first order, and so do you." },
+    { "type": "text", "id": "get_code_text", "label": "Get code button", "default": "Get my code" },
+    { "type": "text", "id": "copy_text", "label": "Copy button", "default": "Copy code" },
+    { "type": "text", "id": "login_link_text", "label": "Login link text", "default": "Log in to see your balance" },
+    { "type": "color", "id": "accent_color", "label": "Accent color", "default": "#121212" },
+    { "type": "range", "id": "corner_radius", "label": "Corner radius", "min": 0, "max": 24, "step": 2, "default": 8 }
+  ]
+}
+{% endschema %}

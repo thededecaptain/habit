@@ -1,0 +1,186 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider  = "postgresql"
+  // Pooled (PgBouncer transaction mode) connection, used by the app at runtime.
+  url       = env("DATABASE_URL")
+  // Direct connection, used only by `prisma migrate` — PgBouncer's transaction
+  // pooling can't support the shadow database Prisma needs for migrations.
+  directUrl = env("DIRECT_URL")
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+// --- Points ledger domain models ---
+// Every model is scoped by `shop` (the *.myshopify.com domain) since a single
+// app deployment serves many merchants. All monetary/points math should be
+// driven off PointTransaction rows rather than mutating balances in place,
+// so refund clawbacks and fraud audits have a full history to replay.
+
+model ShopSettings {
+  shop String @id
+
+  // Earn: customers earn `pointsPerDollar` points per $1 of order subtotal.
+  pointsPerDollar Decimal @default(1) @db.Decimal(6, 2)
+
+  // Redeem: `redemptionRate` points are worth $1 of checkout discount.
+  redemptionRate       Decimal @default(100) @db.Decimal(8, 2)
+  minRedeemablePoints  Int     @default(100)
+  // Caps how much of an order's subtotal can be paid for with points.
+  maxRedemptionPercent Decimal @default(50) @db.Decimal(5, 2)
+
+  // Referrals: both sides earn a flat point bonus on the referred customer's
+  // first completed order.
+  referrerBonusPoints   Int @default(500)
+  refereeBonusPoints    Int @default(250)
+  referralCodeExpiryDays Int @default(30)
+  // Basic fraud guard: caps how many *unredeemed* codes a customer may hold
+  // at once, independent of any Admin API rate limiting.
+  maxActiveReferralCodesPerCustomer Int @default(5)
+
+  // Tracks dismissal of the homepage setup guide (BFS 4.2.2: onboarding must
+  // be dismissible and not reappear once completed).
+  onboardingDismissedAt DateTime?
+
+  // GID of the Shopify Function-powered automatic discount used for point
+  // redemption at checkout (BFS 5.5.1: discounts must use discount functions).
+  // Null until successfully created via discountAutomaticAppCreate.
+  discountAutomaticId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Every model is scoped by `shop` (the *.myshopify.com domain) since a single
+// app deployment serves many merchants. All monetary/points math should be
+// driven off PointTransaction rows rather than mutating balances in place,
+// so refund clawbacks and fraud audits have a full history to replay.
+
+model VipTier {
+  id             String     @id @default(uuid())
+  shop           String
+  name           String
+  // Either threshold may be null; whichever is set is evaluated against the
+  // customer's lifetime totals to decide tier membership.
+  minSpend       Decimal?   @db.Decimal(10, 2)
+  minOrders      Int?
+  earnMultiplier Decimal    @default(1.0) @db.Decimal(4, 2)
+  sortOrder      Int        @default(0)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  customers Customer[]
+
+  @@unique([shop, name])
+  @@index([shop])
+}
+
+model Customer {
+  id                String   @id @default(uuid())
+  shop              String
+  shopifyCustomerId String
+  email             String?
+  displayName       String?
+  // Lifetime totals used for VIP qualification and "spend $X more" copy.
+  lifetimeSpend     Decimal  @default(0) @db.Decimal(12, 2)
+  lifetimeOrders    Int      @default(0)
+  pointsBalance     Int      @default(0)
+  vipTierId         String?
+  vipTier           VipTier? @relation(fields: [vipTierId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  pointTransactions   PointTransaction[]
+  ownedReferralCodes  ReferralCode[] @relation("OwnerReferralCodes")
+  // A customer can redeem at most one referral code (typically first order only).
+  redeemedReferralCode ReferralCode? @relation("RedeemedReferralCode")
+
+  @@unique([shop, shopifyCustomerId])
+  @@index([shop])
+  @@index([vipTierId])
+}
+
+enum PointTransactionType {
+  EARN
+  REDEEM
+  REFUND_REVERSAL
+  REFERRAL_BONUS
+  MANUAL_ADJUSTMENT
+}
+
+model PointTransaction {
+  id             String               @id @default(uuid())
+  shop           String
+  customerId     String
+  customer       Customer             @relation(fields: [customerId], references: [id])
+  type           PointTransactionType
+  // Positive for EARN/REFERRAL_BONUS, negative for REDEEM/REFUND_REVERSAL.
+  points         Int
+  // Shopify order GID this transaction is tied to, if any — required to look
+  // up and reverse points when the refund webhook fires.
+  orderId        String?
+  referralCodeId String?
+  referralCode   ReferralCode?        @relation(fields: [referralCodeId], references: [id])
+  description    String?
+  createdAt      DateTime             @default(now())
+
+  @@index([shop])
+  @@index([customerId])
+  @@index([orderId])
+}
+
+enum ReferralCodeStatus {
+  ACTIVE
+  REDEEMED
+  EXPIRED
+  REVOKED
+}
+
+model ReferralCode {
+  id     String             @id @default(uuid())
+  shop   String
+  code   String             @unique
+  status ReferralCodeStatus @default(ACTIVE)
+
+  ownerId String
+  owner   Customer @relation("OwnerReferralCodes", fields: [ownerId], references: [id])
+
+  redeemedByCustomerId String?   @unique
+  redeemedByCustomer   Customer? @relation("RedeemedReferralCode", fields: [redeemedByCustomerId], references: [id])
+  redeemedAt           DateTime?
+
+  expiresAt         DateTime?
+  pointTransactions PointTransaction[]
+  createdAt         DateTime            @default(now())
+
+  @@index([shop])
+  @@index([ownerId])
+  // Supports the "alert on abnormal code-creation volume" fraud check.
+  @@index([shop, createdAt])
+}

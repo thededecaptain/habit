@@ -1,0 +1,22 @@
+# Learn more about configuring your customer account UI extension:
+# https://shopify.dev/docs/api/customer-account-ui-extensions/latest/configuration
+
+api_version = "2026-07"
+
+[[extensions]]
+name = "account-rewards"
+handle = "account-rewards"
+uid = "b19d469d-b6c1-f124-843e-505eac11069a2c72bae3"
+type = "ui_extension"
+
+[[extensions.targeting]]
+module = "./src/Profile.jsx"
+target = "customer-account.profile.block.render"
+
+[[extensions.targeting]]
+module = "./src/Profile.jsx"
+target = "customer-account.profile.addresses.render-after"
+
+[extensions.capabilities]
+# Needed to call the app backend for the signed-in customer's live balance.
+network_access = true

@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Customer" ADD COLUMN "displayName" TEXT;
+ALTER TABLE "Customer" ADD COLUMN "lifetimeSpend" DECIMAL(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE "Customer" ADD COLUMN "lifetimeOrders" INTEGER NOT NULL DEFAULT 0;

@@ -1,0 +1,44 @@
+{
+  "payload": {
+    "export": "run",
+    "target": "purchase.order-discount.run",
+    "input": {
+      "cart": {
+        "pointsMetafield": {
+          "value": "500"
+        },
+        "pointsAttribute": null,
+        "cost": {
+          "subtotalAmount": {
+            "amount": "100.00"
+          }
+        }
+      },
+      "shop": {
+        "metafield": {
+          "value": "{\"redemptionRate\":100,\"maxRedemptionPercent\":50}"
+        }
+      }
+    },
+    "output": {
+      "discountApplicationStrategy": "FIRST",
+      "discounts": [
+        {
+          "message": "Loyalty points redeemed",
+          "targets": [
+            {
+              "orderSubtotal": {
+                "excludedVariantIds": []
+              }
+            }
+          ],
+          "value": {
+            "fixedAmount": {
+              "amount": "5.00"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

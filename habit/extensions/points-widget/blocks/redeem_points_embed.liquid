@@ -1,0 +1,82 @@
+{% comment %}
+  App embed: injected before </body> on every storefront page. The accompanying
+  script finds the theme's cart drawer (or cart-page checkout button) and
+  mounts the redeem widget next to it. Cart drawers are not theme sections,
+  so they can't accept app blocks — this is the supported way to reach them.
+{% endcomment %}
+
+<template id="habit-redeem-template">
+  {% if customer %}
+    <div
+      class="habit-widget habit-widget--compact"
+      hidden
+      data-habit-redeem
+      data-habit-injected
+      data-proxy-url="/apps/habit"
+      style="
+        {% if block.settings.accent_color != blank and block.settings.accent_color != '#121212' %}--habit-accent: {{ block.settings.accent_color }};{% endif %}
+        --habit-radius: {{ block.settings.corner_radius }}px;
+      "
+    >
+      <div data-habit-loading class="habit-widget__state">
+        <p>{{ block.settings.loading_text | default: 'Checking your rewards…' }}</p>
+      </div>
+
+      <div data-habit-redeem-body hidden>
+        <p class="habit-widget__eyebrow">{{ block.settings.heading | default: 'Redeem points' }}</p>
+        <p class="habit-widget__applied" data-habit-applied-line hidden></p>
+        <p class="habit-widget__balance">
+          <span data-habit-balance>0</span>
+          <span class="habit-widget__balance-label">points</span>
+          <span class="habit-widget__value" data-habit-value hidden></span>
+        </p>
+        <p class="habit-widget__context" data-habit-redeem-balance-text></p>
+
+        <div class="habit-redeem__field">
+          <label class="habit-redeem__label">
+            {{ block.settings.input_label | default: 'Points to redeem' }}
+            <input
+              type="number"
+              data-habit-redeem-input
+              min="0"
+              step="1"
+              inputmode="numeric"
+            >
+          </label>
+          <p class="habit-widget__next-tier" data-habit-redeem-details hidden></p>
+        </div>
+
+        <p class="habit-widget__tier" data-habit-redeem-preview hidden></p>
+
+        <div class="habit-redeem__actions">
+          <button type="button" class="habit-widget__button" data-habit-redeem-apply>
+            {{ block.settings.apply_text | default: 'Apply points' }}
+          </button>
+          <button type="button" class="habit-widget__button habit-widget__button--ghost" data-habit-redeem-remove hidden>
+            {{ block.settings.remove_text | default: 'Remove' }}
+          </button>
+        </div>
+
+        <p class="habit-widget__status" data-habit-redeem-status role="status"></p>
+      </div>
+    </div>
+  {% endif %}
+</template>
+
+{% schema %}
+{
+  "name": "Redeem points in cart",
+  "target": "body",
+  "javascript": "redeem-points.js",
+  "stylesheet": "points-widget.css",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Redeem points" },
+    { "type": "text", "id": "loading_text", "label": "Loading text", "default": "Checking your rewards…" },
+    { "type": "text", "id": "input_label", "label": "Input label", "default": "Points to redeem" },
+    { "type": "text", "id": "apply_text", "label": "Apply button text", "default": "Apply points" },
+    { "type": "text", "id": "remove_text", "label": "Remove button text", "default": "Remove" },
+    { "type": "color", "id": "accent_color", "label": "Accent color", "default": "#121212" },
+    { "type": "range", "id": "corner_radius", "label": "Corner radius", "min": 0, "max": 24, "step": 2, "default": 8 }
+  ]
+}
+{% endschema %}
