@@ -2,20 +2,19 @@
 
 client_id = "3acb5c90ed6b779288c26dee2a0bf291"
 name = "habit"
-application_url = "https://example.com"
+application_url = "https://habit-production-9257.up.railway.app"
 embedded = true
 
 [build]
-automatically_update_urls_on_dev = true
-include_config_on_deploy = true
+automatically_update_urls_on_dev = false
 
 [webhooks]
 api_version = "2026-10"
 
   [webhooks.privacy_compliance]
-  customer_deletion_url = "https://example.com/webhooks/customers/redact"
-  customer_data_request_url = "https://example.com/webhooks/customers/data_request"
-  shop_deletion_url = "https://example.com/webhooks/shop/redact"
+  customer_deletion_url = "https://habit-production-9257.up.railway.app/webhooks/customers/redact"
+  customer_data_request_url = "https://habit-production-9257.up.railway.app/webhooks/customers/data_request"
+  shop_deletion_url = "https://habit-production-9257.up.railway.app/webhooks/shop/redact"
 
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/scopes_update"
@@ -38,9 +37,12 @@ api_version = "2026-10"
 scopes = "read_orders,read_customers,read_discounts,write_discounts"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [
+  "https://habit-production-9257.up.railway.app/auth/callback",
+  "https://habit-production-9257.up.railway.app/api/auth",
+]
 
 [app_proxy]
-url = "https://example.com/proxy"
+url = "https://habit-production-9257.up.railway.app/proxy"
 subpath = "habit"
 prefix = "apps"
