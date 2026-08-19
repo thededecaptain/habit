@@ -1,0 +1,29 @@
+---
+title: Referrals
+description: Reward both the referrer and the new customer from the same points ledger.
+---
+
+Referrals in Habit use the same points ledger as purchases. You do not install a second app or pay a second fee.
+
+## Set referral bonuses
+
+In **Settings**, configure:
+
+| Setting | What it controls |
+|---|---|
+| Referrer bonus | Points the existing customer earns when a referral converts |
+| Referee bonus | Points the new customer earns for using a valid code |
+| Code expiry | How many days an unused code stays valid |
+| Max active codes | How many unused codes one customer can have at once |
+
+## How a referral converts
+
+1. A customer shares their referral code from the storefront widget or account page.
+2. A new customer applies the code.
+3. When that order is paid, Habit credits both bonuses.
+
+## Fraud protection
+
+Habit rate-limits code generation, expires unused codes, and alerts you when referral volume looks abnormal. Tune **referral velocity** in Settings if you sell into a market that attracts coupon-site scraping.
+
+This will not catch every case, but it stops the failure mode where thousands of codes leak overnight with no way to shut them off.

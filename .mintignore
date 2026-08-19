@@ -1,0 +1,7 @@
+habit/
+docs/
+Dockerfile
+railway.toml
+.mint-tmp/
+*.docx
+*.xlsx

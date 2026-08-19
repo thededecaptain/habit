@@ -1,0 +1,54 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "maple",
+  "name": "Habit",
+  "description": "Help center for Habit, the Shopify loyalty and rewards app for small merchants.",
+  "colors": {
+    "primary": "#166E3F",
+    "light": "#26BD6C",
+    "dark": "#0C8C5E"
+  },
+  "favicon": "/favicon.png",
+  "icons": {
+    "library": "lucide"
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting started",
+        "pages": ["index", "getting-started"]
+      },
+      {
+        "group": "Your program",
+        "pages": [
+          "program/points",
+          "program/vip-tiers",
+          "program/referrals",
+          "program/checkout"
+        ]
+      },
+      {
+        "group": "Account",
+        "pages": ["billing", "support"]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Contact support",
+        "href": "/support"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Open Habit",
+      "href": "https://gethabitloyalty.com/"
+    }
+  },
+  "footer": {
+    "socials": {
+      "website": "https://gethabitloyalty.com/"
+    }
+  }
+}

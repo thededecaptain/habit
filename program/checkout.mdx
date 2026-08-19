@@ -1,0 +1,25 @@
+---
+title: Checkout redemption
+description: Let customers apply points as a discount during Shopify checkout.
+---
+
+Customers redeem points at checkout through Habit's checkout UI extension. You do not need Shopify Scripts.
+
+## Customer flow
+
+1. The customer starts checkout while signed in.
+2. If their balance meets your minimum, they can apply points.
+3. Habit adds a discount for the redeemed amount, capped by your **max redemption percent**.
+4. On a successful order, those points leave the ledger.
+
+## Check that it is on
+
+Checkout extensions install with the app. If the redemption field is missing:
+
+1. Confirm Habit is installed and the trial or Standard plan is active.
+2. Place a test order while logged in as a customer with a points balance.
+3. If it still does not appear, email [support@gethabitloyalty.com](mailto:support@gethabitloyalty.com) with the shop domain.
+
+## After a refund
+
+Refunding an order reverses points earned on that order. See [points](/program/points#refunds-reverse-points-automatically) for how the ledger behaves if those points were already spent.
