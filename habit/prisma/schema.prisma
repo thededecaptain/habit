@@ -64,6 +64,23 @@ model ShopSettings {
   // at once, independent of any Admin API rate limiting.
   maxActiveReferralCodesPerCustomer Int @default(5)
 
+  // Shop-wide referral-code velocity alert (codes created across the shop).
+  referralVelocityThreshold     Int       @default(50)
+  referralVelocityWindowMinutes Int       @default(60)
+  referralVelocityAlertAt       DateTime?
+  referralVelocityDismissedAt   DateTime?
+
+  // Encrypted Klaviyo private API key (AES-256-GCM via HABIT_ENCRYPTION_KEY).
+  // Never returned in loaders. Rotating HABIT_ENCRYPTION_KEY makes stored keys
+  // undecryptable — merchants must reconnect Klaviyo.
+  klaviyoApiKeyEncrypted String?
+  klaviyoEnabled         Boolean @default(false)
+  // Optional HTTPS fallback when Klaviyo is not connected.
+  notificationWebhookUrl String?
+
+  // Null = points never expire. Clock is purchase-only (EARN / REDEEM).
+  pointsExpiryDays Int?
+
   // Tracks dismissal of the homepage setup guide (BFS 4.2.2: onboarding must
   // be dismissible and not reappear once completed).
   onboardingDismissedAt DateTime?
@@ -113,6 +130,8 @@ model Customer {
   pointsBalance     Int      @default(0)
   vipTierId         String?
   vipTier           VipTier? @relation(fields: [vipTierId], references: [id])
+  // Last EARN or REDEEM. Referral bonuses and manual adjustments do not count.
+  lastActivityAt    DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -124,6 +143,7 @@ model Customer {
   @@unique([shop, shopifyCustomerId])
   @@index([shop])
   @@index([vipTierId])
+  @@index([shop, lastActivityAt])
 }
 
 enum PointTransactionType {
@@ -132,6 +152,7 @@ enum PointTransactionType {
   REFUND_REVERSAL
   REFERRAL_BONUS
   MANUAL_ADJUSTMENT
+  EXPIRE
 }
 
 model PointTransaction {
@@ -140,7 +161,7 @@ model PointTransaction {
   customerId     String
   customer       Customer             @relation(fields: [customerId], references: [id])
   type           PointTransactionType
-  // Positive for EARN/REFERRAL_BONUS, negative for REDEEM/REFUND_REVERSAL.
+  // Positive for EARN/REFERRAL_BONUS, negative for REDEEM/REFUND_REVERSAL/EXPIRE.
   points         Int
   // Shopify order GID this transaction is tied to, if any — required to look
   // up and reverse points when the refund webhook fires.
@@ -183,4 +204,31 @@ model ReferralCode {
   @@index([ownerId])
   // Supports the "alert on abnormal code-creation volume" fraud check.
   @@index([shop, createdAt])
+}
+
+enum NotificationOutboxStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model NotificationOutbox {
+  id            String                    @id @default(uuid())
+  shop          String
+  eventName     String
+  customerEmail String
+  properties    Json
+  uniqueKey     String
+  status        NotificationOutboxStatus  @default(PENDING)
+  attempts      Int                       @default(0)
+  availableAt   DateTime                  @default(now())
+  lastError     String?
+  processedAt   DateTime?
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+
+  @@unique([shop, uniqueKey])
+  @@index([status, availableAt])
 }

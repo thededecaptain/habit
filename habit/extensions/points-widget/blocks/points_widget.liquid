@@ -25,6 +25,7 @@
     <p class="habit-widget__context" data-habit-context hidden></p>
     <p class="habit-widget__tier" data-habit-tier hidden></p>
     <p class="habit-widget__next-tier" data-habit-next-tier hidden></p>
+    <p class="habit-widget__expiry" data-habit-expiry hidden></p>
     <a class="habit-widget__cta" data-habit-cart-link href="{{ routes.cart_url }}">
       {{ block.settings.redeem_hint | default: 'Redeem in cart' }}
     </a>
@@ -51,7 +52,7 @@
     <p class="habit-widget__eyebrow">{{ block.settings.heading | default: 'Your rewards' }}</p>
     <p class="habit-widget__context" data-habit-guest-context></p>
     <p>
-      <a href="{{ routes.account_login_url }}">{{ block.settings.login_link_text | default: 'Log in to see your balance' }}</a>
+      <a href="{{ routes.account_login_url }}">{{ block.settings.login_link_text | default: 'Log in to start earning' }}</a>
     </p>
   </div>
 </div>
@@ -70,7 +71,7 @@
     { "type": "text", "id": "referral_text", "label": "Referral prompt", "default": "Give friends your code. They get a bonus on their first order, and so do you." },
     { "type": "text", "id": "get_code_text", "label": "Get code button", "default": "Get my code" },
     { "type": "text", "id": "copy_text", "label": "Copy button", "default": "Copy code" },
-    { "type": "text", "id": "login_link_text", "label": "Login link text", "default": "Log in to see your balance" },
+    { "type": "text", "id": "login_link_text", "label": "Login link text", "default": "Log in to start earning" },
     { "type": "color", "id": "accent_color", "label": "Accent color", "default": "#121212" },
     { "type": "range", "id": "corner_radius", "label": "Corner radius", "min": 0, "max": 24, "step": 2, "default": 8 }
   ]

@@ -1,12 +1,32 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useFetcher, useLoaderData } from "react-router";
+import { redirect, useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { getOrCreateShopSettings } from "../lib/ledger.server";
 import { ensureRedemptionDiscount, syncLoyaltySettingsMetafield } from "../lib/discount.server";
+import {
+  STANDARD_PLAN,
+  STANDARD_PLAN_AMOUNT,
+  shouldUseTestCharges,
+  trialEndsAt,
+} from "../lib/billing.server";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "../lib/brand";
+import { EncryptionConfigError, encryptSecret } from "../lib/secrets.server";
+
+// Keep these names in the route so the settings UI can list them without
+// importing a .server module (React Router would otherwise fail the client bundle).
+const KLAVIYO_METRIC_NAMES = [
+  "Habit: Points Earned",
+  "Habit: Tier Upgraded",
+  "Habit: Referral Sent",
+  "Habit: Referral Welcome Bonus",
+  "Habit: Points Redeemed",
+  "Habit: Points Expiring Soon",
+  "Habit: Points Expired",
+] as const;
 
 const SAVE_BAR_ID = "settings-save-bar";
 
@@ -19,11 +39,25 @@ type FormState = {
   refereeBonusPoints: string;
   referralCodeExpiryDays: string;
   maxActiveReferralCodesPerCustomer: string;
+  referralVelocityThreshold: string;
+  referralVelocityWindowMinutes: string;
+  pointsExpiryDays: string;
+  notificationWebhookUrl: string;
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin, billing } = await authenticate.admin(request);
   const settings = await getOrCreateShopSettings(session.shop);
+  const isTest = await shouldUseTestCharges(admin);
+  const check = await billing.check({
+    plans: [STANDARD_PLAN],
+    isTest,
+  });
+  const subscription = check.appSubscriptions[0] ?? null;
+  const trialEnd = subscription
+    ? trialEndsAt(subscription.createdAt, subscription.trialDays)
+    : null;
+  const inTrial = trialEnd ? Date.now() < trialEnd.getTime() : false;
 
   const values: FormState = {
     pointsPerDollar: String(settings.pointsPerDollar),
@@ -34,9 +68,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     refereeBonusPoints: String(settings.refereeBonusPoints),
     referralCodeExpiryDays: String(settings.referralCodeExpiryDays),
     maxActiveReferralCodesPerCustomer: String(settings.maxActiveReferralCodesPerCustomer),
+    referralVelocityThreshold: String(settings.referralVelocityThreshold),
+    referralVelocityWindowMinutes: String(settings.referralVelocityWindowMinutes),
+    pointsExpiryDays: settings.pointsExpiryDays != null ? String(settings.pointsExpiryDays) : "",
+    notificationWebhookUrl: settings.notificationWebhookUrl ?? "",
   };
 
-  return { values };
+  return {
+    values,
+    klaviyoConnected: Boolean(settings.klaviyoEnabled && settings.klaviyoApiKeyEncrypted),
+    amount: STANDARD_PLAN_AMOUNT,
+    subscription: subscription
+      ? {
+          status: subscription.status,
+          inTrial,
+          trialEndsAt: trialEnd?.toISOString() ?? null,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+        }
+      : null,
+  };
 };
 
 function parsePositiveNumber(value: FormDataEntryValue | null, label: string) {
@@ -55,9 +105,79 @@ function parsePositiveInt(value: FormDataEntryValue | null, label: string) {
   return { value: num };
 }
 
+function parseOptionalPositiveInt(value: FormDataEntryValue | null, label: string) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return { value: null as number | null };
+  return parsePositiveInt(value, label);
+}
+
+function parseOptionalHttpsUrl(value: FormDataEntryValue | null, label: string) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return { value: null as string | null };
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:") {
+      return { error: `${label} must be an https URL.` };
+    }
+    return { value: raw };
+  } catch {
+    return { error: `${label} must be a valid URL.` };
+  }
+}
+
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session, admin } = await authenticate.admin(request);
+  const { session, admin, billing } = await authenticate.admin(request);
   const formData = await request.formData();
+
+  if (formData.get("intent") === "cancel-subscription") {
+    const isTest = await shouldUseTestCharges(admin);
+    const check = await billing.check({
+      plans: [STANDARD_PLAN],
+      isTest,
+    });
+    const subscription = check.appSubscriptions[0];
+    if (subscription) {
+      await billing.cancel({
+        subscriptionId: subscription.id,
+        isTest,
+        prorate: true,
+      });
+    }
+    throw redirect("/app/billing?cancelled=1");
+  }
+
+  if (formData.get("intent") === "connect-klaviyo") {
+    const key = String(formData.get("klaviyoApiKey") ?? "").trim();
+    if (!key) {
+      return { errors: { klaviyoApiKey: "Enter a Klaviyo private API key." } };
+    }
+    try {
+      const encrypted = encryptSecret(key);
+      await db.shopSettings.update({
+        where: { shop: session.shop },
+        data: { klaviyoApiKeyEncrypted: encrypted, klaviyoEnabled: true },
+      });
+    } catch (error) {
+      if (error instanceof EncryptionConfigError) {
+        return {
+          errors: {
+            klaviyoApiKey:
+              "Habit isn't configured to store API keys yet. Contact support.",
+          },
+        };
+      }
+      throw error;
+    }
+    return { errors: null, klaviyoSaved: true, klaviyoConnected: true };
+  }
+
+  if (formData.get("intent") === "disconnect-klaviyo") {
+    await db.shopSettings.update({
+      where: { shop: session.shop },
+      data: { klaviyoApiKeyEncrypted: null, klaviyoEnabled: false },
+    });
+    return { errors: null, klaviyoSaved: true, klaviyoConnected: false };
+  }
 
   const fields = {
     pointsPerDollar: parsePositiveNumber(formData.get("pointsPerDollar"), "Points per dollar"),
@@ -86,6 +206,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       formData.get("maxActiveReferralCodesPerCustomer"),
       "Max active referral codes",
     ),
+    referralVelocityThreshold: parsePositiveInt(
+      formData.get("referralVelocityThreshold"),
+      "Referral velocity threshold",
+    ),
+    referralVelocityWindowMinutes: parsePositiveInt(
+      formData.get("referralVelocityWindowMinutes"),
+      "Referral velocity window",
+    ),
+    pointsExpiryDays: parseOptionalPositiveInt(
+      formData.get("pointsExpiryDays"),
+      "Points expiry",
+    ),
+    notificationWebhookUrl: parseOptionalHttpsUrl(
+      formData.get("notificationWebhookUrl"),
+      "Notification webhook URL",
+    ),
   };
 
   const errors = Object.fromEntries(
@@ -113,6 +249,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       refereeBonusPoints: fields.refereeBonusPoints.value,
       referralCodeExpiryDays: fields.referralCodeExpiryDays.value,
       maxActiveReferralCodesPerCustomer: fields.maxActiveReferralCodesPerCustomer.value,
+      referralVelocityThreshold: fields.referralVelocityThreshold.value,
+      referralVelocityWindowMinutes: fields.referralVelocityWindowMinutes.value,
+      pointsExpiryDays: fields.pointsExpiryDays.value,
+      notificationWebhookUrl: fields.notificationWebhookUrl.value,
     },
   });
 
@@ -123,9 +263,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Settings() {
-  const { values } = useLoaderData<typeof loader>();
+  const { values, klaviyoConnected, amount, subscription } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
+  const billingFetcher = useFetcher();
+  const notifyFetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
+  const klaviyoKeyRef = useRef("");
 
   const [form, setForm] = useState<FormState>(values);
   // Bumped on discard to force the (uncontrolled) fields below to remount
@@ -143,6 +286,11 @@ export default function Settings() {
   const errors = Object.fromEntries(
     Object.entries(rawErrors).filter(([key]) => !editedSinceSubmit.has(key)),
   ) as typeof rawErrors;
+  const klaviyoError =
+    notifyFetcher.data && notifyFetcher.data.errors
+      ? notifyFetcher.data.errors.klaviyoApiKey
+      : undefined;
+  const notifyBusy = notifyFetcher.state !== "idle";
 
   useEffect(() => {
     if (isDirty) {
@@ -164,6 +312,16 @@ export default function Settings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetcher.data]);
 
+  useEffect(() => {
+    if (notifyFetcher.data && !notifyFetcher.data.errors) {
+      shopify.toast.show(
+        notifyFetcher.data.klaviyoConnected ? "Klaviyo connected" : "Klaviyo disconnected",
+      );
+      klaviyoKeyRef.current = "";
+      setResetKey((key) => key + 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifyFetcher.data]);
   // These fields are intentionally uncontrolled (defaultValue, not value):
   // Polaris's number/text field custom elements don't reliably accept
   // programmatic `value` updates from React re-renders, so feeding the typed
@@ -187,8 +345,86 @@ export default function Settings() {
     setResetKey((key) => key + 1);
   };
 
+  const cancelling = billingFetcher.state !== "idle";
+  const inTrial = Boolean(subscription?.inTrial);
+
   return (
     <s-page heading="Settings">
+      <s-section heading="Billing">
+        <s-stack direction="block" gap="base">
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <s-text type="strong">Standard · ${amount}/month</s-text>
+            {subscription ? (
+              <s-badge tone={inTrial ? "info" : "success"}>
+                {inTrial ? "Trial" : "Active"}
+              </s-badge>
+            ) : (
+              <s-badge tone="warning">Inactive</s-badge>
+            )}
+          </s-stack>
+          {subscription ? (
+            <s-paragraph color="subdued">
+              {inTrial && subscription.trialEndsAt
+                ? `Trial ends ${new Date(subscription.trialEndsAt).toLocaleDateString()}. Then $${amount}/month.`
+                : subscription.currentPeriodEnd
+                  ? `Renews ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}.`
+                  : `$${amount} billed every 30 days.`}
+            </s-paragraph>
+          ) : (
+            <s-paragraph color="subdued">
+              Start a 14-day free trial to keep Habit running.
+            </s-paragraph>
+          )}
+          {subscription ? (
+            <>
+              <s-button
+                tone="critical"
+                commandFor="cancel-subscription-modal"
+                command="--show"
+              >
+                Cancel subscription
+              </s-button>
+              <s-modal
+                id="cancel-subscription-modal"
+                heading="Cancel Habit?"
+                accessibilityLabel="Cancel Habit subscription"
+              >
+                <s-paragraph>
+                  Billing stops immediately. Unused time in the current period is
+                  credited. You can start a new trial later from this app.
+                </s-paragraph>
+                <s-button
+                  slot="secondary-actions"
+                  variant="secondary"
+                  commandFor="cancel-subscription-modal"
+                  command="--hide"
+                >
+                  Keep subscription
+                </s-button>
+                <s-button
+                  slot="primary-action"
+                  variant="primary"
+                  tone="critical"
+                  loading={cancelling}
+                  onClick={() =>
+                    billingFetcher.submit(
+                      { intent: "cancel-subscription" },
+                      { method: "POST" },
+                    )
+                  }
+                >
+                  Cancel subscription
+                </s-button>
+              </s-modal>
+            </>
+          ) : (
+            <s-button variant="primary" href="/app/billing">
+              Start free trial
+            </s-button>
+          )}
+        </s-stack>
+      </s-section>
+
       <s-section heading="Earning points">
         <s-stack direction="block" gap="base">
           <s-number-field
@@ -202,6 +438,9 @@ export default function Settings() {
             step={0.5}
             details="Applied to the order subtotal, before VIP tier multipliers."
           />
+          <s-paragraph color="subdued">
+            VIP tiers are based on lifetime spend and orders and never drop.
+          </s-paragraph>
         </s-stack>
       </s-section>
 
@@ -311,6 +550,120 @@ export default function Settings() {
             step={1}
             details="Basic fraud protection: caps how many unused codes a member can generate."
           />
+          <s-number-field
+            key={`referralVelocityThreshold-${resetKey}`}
+            label="Alert after this many codes shop-wide"
+            name="referralVelocityThreshold"
+            defaultValue={values.referralVelocityThreshold}
+            onInput={update("referralVelocityThreshold")}
+            error={errors.referralVelocityThreshold}
+            min={1}
+            step={1}
+            details="Triggers a dashboard banner when this many referral codes are created in the window below."
+          />
+          <s-number-field
+            key={`referralVelocityWindowMinutes-${resetKey}`}
+            label="Velocity window (minutes)"
+            name="referralVelocityWindowMinutes"
+            defaultValue={values.referralVelocityWindowMinutes}
+            onInput={update("referralVelocityWindowMinutes")}
+            error={errors.referralVelocityWindowMinutes}
+            min={1}
+            step={1}
+          />
+        </s-stack>
+      </s-section>
+
+      <s-section heading="Points expiry">
+        <s-stack direction="block" gap="base">
+          <s-number-field
+            key={`pointsExpiryDays-${resetKey}`}
+            label="Expire unused points after (days)"
+            name="pointsExpiryDays"
+            defaultValue={values.pointsExpiryDays}
+            onInput={update("pointsExpiryDays")}
+            error={errors.pointsExpiryDays}
+            min={1}
+            step={1}
+            details="Leave blank to never expire. Inactivity is measured from the member's last earn-on-order or redemption — referral bonuses and manual adjustments do not reset the clock. This is not earn-date FIFO: the whole balance expires together."
+          />
+        </s-stack>
+      </s-section>
+
+      <s-section heading="Notifications">
+        <s-stack direction="block" gap="base">
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <s-text type="strong">Klaviyo</s-text>
+            {klaviyoConnected ? (
+              <s-badge tone="success">Connected</s-badge>
+            ) : (
+              <s-badge tone="warning">Not connected</s-badge>
+            )}
+          </s-stack>
+          <s-paragraph color="subdued">
+            Build flows in Klaviyo from these metrics. The private API key needs events:write.
+            If the server encryption key is rotated, reconnect Klaviyo here — stored keys cannot
+            be decrypted with a new key. Webhook URLs are unaffected.
+          </s-paragraph>
+          <s-unordered-list>
+            {KLAVIYO_METRIC_NAMES.map((name) => (
+              <s-list-item key={name}>{name}</s-list-item>
+            ))}
+          </s-unordered-list>
+          <s-password-field
+            key={`klaviyoApiKey-${resetKey}`}
+            label="Klaviyo private API key"
+            name="klaviyoApiKey"
+            autocomplete="off"
+            error={klaviyoError}
+            details="Leave empty except to set or replace the key. The key is never shown again."
+            onInput={(event: { currentTarget?: { value?: string } }) => {
+              klaviyoKeyRef.current = event.currentTarget?.value ?? "";
+            }}
+          />
+          <s-stack direction="inline" gap="small-200">
+            <s-button
+              variant="primary"
+              loading={notifyBusy}
+              onClick={() =>
+                notifyFetcher.submit(
+                  { intent: "connect-klaviyo", klaviyoApiKey: klaviyoKeyRef.current },
+                  { method: "POST" },
+                )
+              }
+            >
+              {klaviyoConnected ? "Replace key" : "Connect Klaviyo"}
+            </s-button>
+            {klaviyoConnected ? (
+              <s-button
+                tone="critical"
+                loading={notifyBusy}
+                onClick={() =>
+                  notifyFetcher.submit({ intent: "disconnect-klaviyo" }, { method: "POST" })
+                }
+              >
+                Disconnect
+              </s-button>
+            ) : null}
+          </s-stack>
+          <s-url-field
+            key={`notificationWebhookUrl-${resetKey}`}
+            label="Optional notification webhook URL"
+            name="notificationWebhookUrl"
+            defaultValue={values.notificationWebhookUrl}
+            onInput={update("notificationWebhookUrl")}
+            error={errors.notificationWebhookUrl}
+            details="Used only when Klaviyo is not connected. Habit POSTs JSON with eventName, customerEmail, and properties."
+          />
+        </s-stack>
+      </s-section>
+
+      <s-section>
+        <s-stack alignItems="center">
+          <s-text>
+            Need help? Email{" "}
+            <s-link href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</s-link>.
+          </s-text>
         </s-stack>
       </s-section>
 

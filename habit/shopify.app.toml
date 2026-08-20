@@ -39,7 +39,6 @@ scopes = "read_orders,read_customers,read_discounts,write_discounts"
 [auth]
 redirect_urls = [
   "https://habit-production-9257.up.railway.app/auth/callback",
-  "https://habit-production-9257.up.railway.app/api/auth",
 ]
 
 [app_proxy]

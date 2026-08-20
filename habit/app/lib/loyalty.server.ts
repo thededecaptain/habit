@@ -1,6 +1,11 @@
 import type { Customer, ShopSettings, VipTier } from "@prisma/client";
 import prisma from "../db.server";
-import { getOrCreateCustomer, getOrCreateShopSettings, resolveVipTier } from "./ledger.server";
+import {
+  getOrCreateCustomer,
+  getOrCreateShopSettings,
+  lastPurchaseActivity,
+  resolveVipTier,
+} from "./ledger.server";
 
 type AdminClient = {
   graphql: (
@@ -31,6 +36,7 @@ export type LoyaltyCard = {
   nextTierRemainingOrders: number | null;
   referralCode: string | null;
   history?: LoyaltyHistoryItem[];
+  expiresInDays: number | null;
 };
 
 type ShopifyProfile = {
@@ -157,6 +163,15 @@ export async function syncCustomersFromShopify(
   return profiles;
 }
 
+export function computeExpiresInDays(
+  pointsExpiryDays: number | null | undefined,
+  lastActivity: Date,
+): number | null {
+  if (pointsExpiryDays == null) return null;
+  const expiryMs = lastActivity.getTime() + pointsExpiryDays * 24 * 60 * 60 * 1000;
+  return Math.ceil((expiryMs - Date.now()) / (24 * 60 * 60 * 1000));
+}
+
 function toCard(
   settings: ShopSettings,
   customer: (Customer & { vipTier: VipTier | null }) | null,
@@ -166,6 +181,9 @@ function toCard(
 ): LoyaltyCard {
   const rate = Number(settings.redemptionRate) || 1;
   const balance = customer?.pointsBalance ?? 0;
+  const expiresInDays = customer
+    ? computeExpiresInDays(settings.pointsExpiryDays, lastPurchaseActivity(customer))
+    : null;
   return {
     loggedIn: true,
     pointsBalance: balance,
@@ -180,6 +198,7 @@ function toCard(
     nextTierRemainingSpend: next.nextTierRemainingSpend,
     nextTierRemainingOrders: next.nextTierRemainingOrders,
     referralCode,
+    expiresInDays,
     ...(history ? { history } : {}),
   };
 }

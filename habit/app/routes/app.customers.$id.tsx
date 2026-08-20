@@ -1,5 +1,7 @@
-import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { useEffect } from "react";
+import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
@@ -63,12 +65,34 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   };
 };
 
+export const action = async ({ request, params }: ActionFunctionArgs) => {
+  const { session } = await authenticate.admin(request);
+  const formData = await request.formData();
+
+  if (formData.get("intent") === "revoke-code") {
+    const codeId = String(formData.get("codeId") ?? "");
+    await db.referralCode.updateMany({
+      where: {
+        id: codeId,
+        shop: session.shop,
+        ownerId: params.id,
+        status: "ACTIVE",
+      },
+      data: { status: "REVOKED" },
+    });
+    return { ok: true };
+  }
+
+  return null;
+};
+
 const TYPE_LABELS: Record<string, string> = {
   EARN: "Earned",
   REDEEM: "Redeemed",
   REFUND_REVERSAL: "Refund clawback",
   REFERRAL_BONUS: "Referral bonus",
   MANUAL_ADJUSTMENT: "Manual adjustment",
+  EXPIRE: "Expired",
 };
 
 const CODE_TONE: Record<string, "success" | "info" | "critical" | "neutral"> = {
@@ -80,6 +104,14 @@ const CODE_TONE: Record<string, "success" | "info" | "critical" | "neutral"> = {
 
 export default function CustomerDetail() {
   const { customer, transactions, referralCodes } = useLoaderData<typeof loader>();
+  const fetcher = useFetcher<typeof action>();
+  const shopify = useAppBridge();
+
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data && "ok" in fetcher.data && fetcher.data.ok) {
+      shopify.toast.show("Referral code revoked");
+    }
+  }, [fetcher.state, fetcher.data, shopify]);
 
   return (
     <s-page heading={customer.displayName || customer.email || customer.shopifyCustomerId}>
@@ -156,6 +188,21 @@ export default function CustomerDetail() {
               <s-stack key={c.id} direction="inline" gap="small-200" alignItems="center">
                 <s-text type="strong">{c.code}</s-text>
                 <s-badge tone={CODE_TONE[c.status] ?? "neutral"}>{c.status}</s-badge>
+                {c.status === "ACTIVE" ? (
+                  <s-button
+                    variant="tertiary"
+                    tone="critical"
+                    loading={fetcher.state !== "idle"}
+                    onClick={() =>
+                      fetcher.submit(
+                        { intent: "revoke-code", codeId: c.id },
+                        { method: "POST" },
+                      )
+                    }
+                  >
+                    Revoke
+                  </s-button>
+                ) : null}
               </s-stack>
             ))}
           </s-stack>

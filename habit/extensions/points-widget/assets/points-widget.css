@@ -24,7 +24,8 @@
 .habit-widget__state p,
 .habit-widget__context,
 .habit-widget__tier,
-.habit-widget__next-tier {
+.habit-widget__next-tier,
+.habit-widget__expiry {
   margin: 0 0 0.5em;
   font-size: 0.95em;
 }
@@ -67,7 +68,8 @@
   opacity: 0.85;
 }
 
-.habit-widget__next-tier {
+.habit-widget__next-tier,
+.habit-widget__expiry {
   font-size: 0.9em;
   opacity: 0.85;
 }

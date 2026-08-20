@@ -23,6 +23,7 @@
     if (!cents || !rate) return "";
     var pts = Math.floor((cents / 100) * rate * mult);
     if (pts <= 0) return "";
+    if (!loggedIn) return "Earn ~" + pts.toLocaleString() + " points on this product.";
     return "This product would earn " + pts.toLocaleString() + " points.";
   }
 
@@ -88,6 +89,21 @@
         if (nextTierEl && nextLine) {
           nextTierEl.hidden = false;
           nextTierEl.textContent = nextLine;
+        }
+
+        var expiryEl = root.querySelector("[data-habit-expiry]");
+        var expiresInDays = Number(data.expiresInDays);
+        if (
+          expiryEl &&
+          data.pointsBalance > 0 &&
+          expiresInDays > 0 &&
+          expiresInDays <= 30
+        ) {
+          expiryEl.hidden = false;
+          expiryEl.textContent =
+            expiresInDays === 1
+              ? "Your points expire in 1 day."
+              : "Your points expire in " + expiresInDays + " days.";
         }
 
         var codeEl = root.querySelector("[data-habit-referral-code]");

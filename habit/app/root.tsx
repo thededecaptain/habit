@@ -1,4 +1,10 @@
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import type { LinksFunction } from "react-router";
+
+export const links: LinksFunction = () => [
+  { rel: "icon", type: "image/png", href: "/favicon.png" },
+  { rel: "apple-touch-icon", href: "/favicon.png" },
+];
 
 export default function App() {
   return (

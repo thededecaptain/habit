@@ -1,6 +1,16 @@
 import { PointTransactionType, ReferralCodeStatus } from "@prisma/client";
 import type { Customer, ShopSettings, VipTier } from "@prisma/client";
 import prisma from "../db.server";
+import { checkReferralVelocity } from "./fraud.server";
+import {
+  enqueueLoyaltyEvent,
+  EVENT_POINTS_EARNED,
+  EVENT_POINTS_EXPIRED,
+  EVENT_POINTS_REDEEMED,
+  EVENT_REFERRAL_SENT,
+  EVENT_REFERRAL_WELCOME,
+  EVENT_TIER_UPGRADED,
+} from "./notifications.server";
 
 const DEFAULT_SETTINGS = {
   pointsPerDollar: 1,
@@ -11,7 +21,19 @@ const DEFAULT_SETTINGS = {
   refereeBonusPoints: 250,
   referralCodeExpiryDays: 30,
   maxActiveReferralCodesPerCustomer: 5,
+  referralVelocityThreshold: 50,
+  referralVelocityWindowMinutes: 60,
 } as const;
+
+export const DAY_MS = 24 * 60 * 60 * 1000;
+const EXPIRE_BATCH = 100;
+
+export function lastPurchaseActivity(customer: {
+  lastActivityAt: Date | null;
+  createdAt: Date;
+}) {
+  return customer.lastActivityAt ?? customer.createdAt;
+}
 
 export async function getOrCreateShopSettings(shop: string): Promise<ShopSettings> {
   const existing = await prisma.shopSettings.findUnique({ where: { shop } });
@@ -92,22 +114,46 @@ export async function awardPointsForOrder(params: {
   const lifetimeSpend = Number(customer.lifetimeSpend) + subtotalAmount;
   const lifetimeOrders = customer.lifetimeOrders + 1;
   const nextTier = resolveVipTier(tiers, lifetimeSpend, lifetimeOrders);
+  const previousVipTierId = customer.vipTierId;
+  const tierUpgraded = Boolean(nextTier && nextTier.id !== previousVipTierId);
+  const email = customerEmail ?? customer.email;
+  const now = new Date();
 
   if (points <= 0) {
-    await prisma.customer.update({
-      where: { id: customer.id },
-      data: {
-        lifetimeSpend,
-        lifetimeOrders,
-        vipTierId: nextTier?.id ?? null,
-        ...(customerEmail ? { email: customerEmail } : {}),
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.customer.update({
+        where: { id: customer.id },
+        data: {
+          lifetimeSpend,
+          lifetimeOrders,
+          vipTierId: nextTier?.id ?? null,
+          lastActivityAt: now,
+          ...(customerEmail ? { email: customerEmail } : {}),
+        },
+      });
+      if (tierUpgraded && nextTier) {
+        await enqueueLoyaltyEvent(tx, {
+          shop,
+          eventName: EVENT_TIER_UPGRADED,
+          customerEmail: email,
+          uniqueKey: `${EVENT_TIER_UPGRADED}:${customer.id}:${orderId}`,
+          properties: {
+            tierName: nextTier.name,
+            tierId: nextTier.id,
+            lifetimeSpend,
+            lifetimeOrders,
+            orderId,
+          },
+        });
+      }
     });
     return null;
   }
 
-  const [transaction] = await prisma.$transaction([
-    prisma.pointTransaction.create({
+  const newBalance = customer.pointsBalance + points;
+
+  return prisma.$transaction(async (tx) => {
+    const transaction = await tx.pointTransaction.create({
       data: {
         shop,
         customerId: customer.id,
@@ -118,20 +164,42 @@ export async function awardPointsForOrder(params: {
           multiplier !== 1 ? `, ${multiplier}x ${currentTier?.name} tier` : ""
         })`,
       },
-    }),
-    prisma.customer.update({
+    });
+    await tx.customer.update({
       where: { id: customer.id },
       data: {
         pointsBalance: { increment: points },
         lifetimeSpend,
         lifetimeOrders,
         vipTierId: nextTier?.id ?? null,
+        lastActivityAt: now,
         ...(customerEmail ? { email: customerEmail } : {}),
       },
-    }),
-  ]);
-
-  return transaction;
+    });
+    await enqueueLoyaltyEvent(tx, {
+      shop,
+      eventName: EVENT_POINTS_EARNED,
+      customerEmail: email,
+      uniqueKey: `${EVENT_POINTS_EARNED}:${transaction.id}`,
+      properties: { points, orderId, pointsBalance: newBalance },
+    });
+    if (tierUpgraded && nextTier) {
+      await enqueueLoyaltyEvent(tx, {
+        shop,
+        eventName: EVENT_TIER_UPGRADED,
+        customerEmail: email,
+        uniqueKey: `${EVENT_TIER_UPGRADED}:${transaction.id}`,
+        properties: {
+          tierName: nextTier.name,
+          tierId: nextTier.id,
+          lifetimeSpend,
+          lifetimeOrders,
+          orderId,
+        },
+      });
+    }
+    return transaction;
+  });
 }
 
 /**
@@ -249,8 +317,10 @@ export async function finalizeRedemptionForOrder(params: {
   }
   if (pointsToDeduct <= 0) return null;
 
-  const [transaction] = await prisma.$transaction([
-    prisma.pointTransaction.create({
+  const newBalance = customer.pointsBalance - pointsToDeduct;
+
+  return prisma.$transaction(async (tx) => {
+    const transaction = await tx.pointTransaction.create({
       data: {
         shop,
         customerId: customer.id,
@@ -259,14 +329,20 @@ export async function finalizeRedemptionForOrder(params: {
         orderId,
         description: `Redeemed at checkout for order discount`,
       },
-    }),
-    prisma.customer.update({
+    });
+    await tx.customer.update({
       where: { id: customer.id },
-      data: { pointsBalance: { decrement: pointsToDeduct } },
-    }),
-  ]);
-
-  return transaction;
+      data: { pointsBalance: { decrement: pointsToDeduct }, lastActivityAt: new Date() },
+    });
+    await enqueueLoyaltyEvent(tx, {
+      shop,
+      eventName: EVENT_POINTS_REDEEMED,
+      customerEmail: customer.email,
+      uniqueKey: `${EVENT_POINTS_REDEEMED}:${transaction.id}`,
+      properties: { points: pointsToDeduct, orderId, pointsBalance: newBalance },
+    });
+    return transaction;
+  });
 }
 
 function generateCode(length = 8) {
@@ -307,9 +383,17 @@ export async function createReferralCode(shop: string, shopifyCustomerId: string
     code = generateCode();
   }
 
-  return prisma.referralCode.create({
+  const created = await prisma.referralCode.create({
     data: { shop, code, ownerId: owner.id, expiresAt },
   });
+
+  try {
+    await checkReferralVelocity(shop);
+  } catch (error) {
+    console.warn(`Referral velocity check failed for ${shop}`, error);
+  }
+
+  return created;
 }
 
 /**
@@ -351,16 +435,20 @@ export async function redeemReferralCode(params: {
     throw new ReferralError("A referral code has already been used on this account.");
   }
 
-  await prisma.$transaction([
-    prisma.referralCode.update({
+  const owner = await prisma.customer.findUniqueOrThrow({
+    where: { id: referralCode.ownerId },
+  });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.referralCode.update({
       where: { id: referralCode.id },
       data: {
         status: ReferralCodeStatus.REDEEMED,
         redeemedByCustomerId: referee.id,
         redeemedAt: new Date(),
       },
-    }),
-    prisma.pointTransaction.create({
+    });
+    const referrerTx = await tx.pointTransaction.create({
       data: {
         shop,
         customerId: referralCode.ownerId,
@@ -370,12 +458,12 @@ export async function redeemReferralCode(params: {
         orderId,
         description: "Referral bonus (friend's first order)",
       },
-    }),
-    prisma.customer.update({
+    });
+    await tx.customer.update({
       where: { id: referralCode.ownerId },
       data: { pointsBalance: { increment: settings.referrerBonusPoints } },
-    }),
-    prisma.pointTransaction.create({
+    });
+    const refereeTx = await tx.pointTransaction.create({
       data: {
         shop,
         customerId: referee.id,
@@ -385,10 +473,89 @@ export async function redeemReferralCode(params: {
         orderId,
         description: "Welcome bonus (referred by a friend)",
       },
-    }),
-    prisma.customer.update({
+    });
+    await tx.customer.update({
       where: { id: referee.id },
       data: { pointsBalance: { increment: settings.refereeBonusPoints } },
-    }),
-  ]);
+    });
+    await enqueueLoyaltyEvent(tx, {
+      shop,
+      eventName: EVENT_REFERRAL_SENT,
+      customerEmail: owner.email,
+      uniqueKey: `${EVENT_REFERRAL_SENT}:${referrerTx.id}`,
+      properties: { bonusPoints: settings.referrerBonusPoints, code: referralCode.code },
+    });
+    await enqueueLoyaltyEvent(tx, {
+      shop,
+      eventName: EVENT_REFERRAL_WELCOME,
+      customerEmail: referee.email,
+      uniqueKey: `${EVENT_REFERRAL_WELCOME}:${refereeTx.id}`,
+      properties: { bonusPoints: settings.refereeBonusPoints, code: referralCode.code },
+    });
+  });
+}
+
+/**
+ * Zeroes inactive balances for shops with points expiry enabled.
+ * Purchase-only clock: lastActivityAt (EARN/REDEEM) coalesced with createdAt.
+ */
+export async function expireInactiveBalances() {
+  const shops = await prisma.shopSettings.findMany({
+    where: { pointsExpiryDays: { not: null } },
+    select: { shop: true, pointsExpiryDays: true },
+  });
+
+  let expired = 0;
+
+  for (const shop of shops) {
+    const days = shop.pointsExpiryDays;
+    if (days == null || days <= 0) continue;
+
+    const cutoff = new Date(Date.now() - days * DAY_MS);
+    const members = await prisma.customer.findMany({
+      where: {
+        shop: shop.shop,
+        pointsBalance: { gt: 0 },
+        OR: [
+          { lastActivityAt: { lte: cutoff } },
+          { lastActivityAt: null, createdAt: { lte: cutoff } },
+        ],
+      },
+      take: EXPIRE_BATCH,
+    });
+
+    for (const member of members) {
+      const didExpire = await prisma.$transaction(async (tx) => {
+        const fresh = await tx.customer.findUnique({ where: { id: member.id } });
+        if (!fresh || fresh.pointsBalance <= 0) return false;
+        if (lastPurchaseActivity(fresh) > cutoff) return false;
+
+        const pointsExpired = fresh.pointsBalance;
+        const expireTx = await tx.pointTransaction.create({
+          data: {
+            shop: shop.shop,
+            customerId: fresh.id,
+            type: PointTransactionType.EXPIRE,
+            points: -pointsExpired,
+            description: `Expired after ${days} days of purchase inactivity`,
+          },
+        });
+        await tx.customer.update({
+          where: { id: fresh.id },
+          data: { pointsBalance: 0 },
+        });
+        await enqueueLoyaltyEvent(tx, {
+          shop: shop.shop,
+          eventName: EVENT_POINTS_EXPIRED,
+          customerEmail: fresh.email,
+          uniqueKey: `${EVENT_POINTS_EXPIRED}:${expireTx.id}`,
+          properties: { pointsExpired },
+        });
+        return true;
+      });
+      if (didExpire) expired += 1;
+    }
+  }
+
+  return expired;
 }

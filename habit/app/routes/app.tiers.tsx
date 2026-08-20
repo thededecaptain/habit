@@ -172,6 +172,11 @@ export default function VipTiers() {
       </s-button>
 
       <s-section>
+        <s-paragraph color="subdued">
+          Tiers are based on lifetime spend and orders and never drop.
+        </s-paragraph>
+      </s-section>
+      <s-section>
         {tiers.length === 0 ? (
           <s-paragraph color="subdued">
             No VIP tiers yet. Members earn the base rate until you add one.

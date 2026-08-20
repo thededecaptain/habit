@@ -9,12 +9,22 @@ import db from "../db.server";
 
 const ADJUST_MODAL_ID = "adjust-points-modal";
 
+function membersHref(page: number, q: string) {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (page > 1) params.set("page", String(page));
+  const qs = params.toString();
+  return qs ? `/app/customers?${qs}` : "/app/customers";
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.trim() ?? "";
+  const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
+  const PAGE_SIZE = 50;
 
-  const customers = await db.customer.findMany({
+  const rows = await db.customer.findMany({
     where: {
       shop: session.shop,
       ...(q
@@ -29,11 +39,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
     include: { vipTier: true },
     orderBy: { updatedAt: "desc" },
-    take: 50,
+    take: PAGE_SIZE + 1,
+    skip: (page - 1) * PAGE_SIZE,
   });
+
+  const hasNext = rows.length > PAGE_SIZE;
+  const customers = rows.slice(0, PAGE_SIZE);
 
   return {
     q,
+    page,
+    hasNext,
     customers: customers.map((c) => ({
       id: c.id,
       shopifyCustomerId: c.shopifyCustomerId,
@@ -85,7 +101,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Customers() {
-  const { q, customers } = useLoaderData<typeof loader>();
+  const { q, page, hasNext, customers } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
   const [, setSearchParams] = useSearchParams();
@@ -199,6 +215,21 @@ export default function Customers() {
             </s-table-body>
           </s-table>
         )}
+        {customers.length > 0 ? (
+          <s-box paddingBlockStart="base">
+            <s-stack direction="inline" gap="small-200">
+              <s-button
+                disabled={page <= 1}
+                href={page <= 1 ? undefined : membersHref(page - 1, q)}
+              >
+                Previous
+              </s-button>
+              <s-button disabled={!hasNext} href={!hasNext ? undefined : membersHref(page + 1, q)}>
+                Next
+              </s-button>
+            </s-stack>
+          </s-box>
+        ) : null}
       </s-section>
 
       <s-modal id={ADJUST_MODAL_ID} ref={modalRef} heading={`Adjust points${target ? ` — ${target.label}` : ""}`}>

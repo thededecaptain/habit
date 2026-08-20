@@ -2,11 +2,20 @@ import "@shopify/shopify-app-react-router/adapters/node";
 import {
   ApiVersion,
   AppDistribution,
+  BillingInterval,
   shopifyApp,
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 import { bootstrapShop } from "./lib/discount.server";
+import {
+  STANDARD_PLAN,
+  STANDARD_PLAN_AMOUNT,
+  STANDARD_PLAN_CURRENCY,
+  STANDARD_PLAN_TRIAL_DAYS,
+} from "./lib/billing-plan";
+
+export { STANDARD_PLAN, STANDARD_PLAN_AMOUNT, STANDARD_PLAN_TRIAL_DAYS };
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -17,6 +26,18 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
+  billing: {
+    [STANDARD_PLAN]: {
+      trialDays: STANDARD_PLAN_TRIAL_DAYS,
+      lineItems: [
+        {
+          amount: STANDARD_PLAN_AMOUNT,
+          currencyCode: STANDARD_PLAN_CURRENCY,
+          interval: BillingInterval.Every30Days,
+        },
+      ],
+    },
+  },
   hooks: {
     afterAuth: async ({ session, admin }) => {
       // Seed default settings, sync the loyalty metafield, and create the

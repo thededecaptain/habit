@@ -5,6 +5,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { getOrCreateShopSettings } from "../lib/ledger.server";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "../lib/brand";
 
 const THEME_EDITOR = "shopify://admin/themes/current/editor";
 const CART_EMBED =
@@ -26,7 +27,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const settings = await getOrCreateShopSettings(shop);
 
-  const [memberCount, tierCount, pointTotals, liabilityAgg] = await Promise.all([
+  const [memberCount, tierCount, pointTotals, liabilityAgg, repeatMembers, gmv] = await Promise.all([
     db.customer.count({ where: { shop } }),
     db.vipTier.count({ where: { shop } }),
     db.pointTransaction.groupBy({
@@ -35,27 +36,41 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       _sum: { points: true },
     }),
     db.customer.aggregate({ where: { shop }, _sum: { pointsBalance: true } }),
+    db.customer.count({ where: { shop, lifetimeOrders: { gt: 1 } } }),
+    db.customer.aggregate({ where: { shop }, _sum: { lifetimeSpend: true } }),
   ]);
 
   const pointsByType = Object.fromEntries(
     pointTotals.map((row) => [row.type, row._sum.points ?? 0]),
   );
+  const pointsIssued = pointsByType.EARN ?? 0;
+  const pointsRedeemed = Math.abs(pointsByType.REDEEM ?? 0);
+  const memberGmv = Number(gmv._sum.lifetimeSpend ?? 0);
+  const redeemedDollars = pointsRedeemed / (Number(settings.redemptionRate) || 1);
 
   const ratesReviewed =
     Number(settings.pointsPerDollar) !== 1 ||
     Number(settings.redemptionRate) !== 100 ||
     settings.updatedAt.getTime() - settings.createdAt.getTime() > 5000;
 
+  const showVelocityAlert =
+    settings.referralVelocityAlertAt != null &&
+    (settings.referralVelocityDismissedAt == null ||
+      settings.referralVelocityDismissedAt < settings.referralVelocityAlertAt);
+
   return {
     shop,
     onboardingDismissed: settings.onboardingDismissedAt != null,
+    showVelocityAlert,
     hasCustomTiers: tierCount > 0,
     ratesReviewed,
     metrics: {
       memberCount,
-      pointsIssued: pointsByType.EARN ?? 0,
-      pointsRedeemed: Math.abs(pointsByType.REDEEM ?? 0),
+      pointsIssued,
+      pointsRedeemed,
       outstandingLiability: liabilityAgg._sum.pointsBalance ?? 0,
+      repeatPurchaseRate: memberCount > 0 ? repeatMembers / memberCount : 0,
+      redemptionOfGmv: memberGmv > 0 ? redeemedDollars / memberGmv : 0,
     },
     settings: {
       pointsPerDollar: Number(settings.pointsPerDollar),
@@ -73,6 +88,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await db.shopSettings.update({
       where: { shop },
       data: { onboardingDismissedAt: new Date() },
+    });
+  }
+
+  if (formData.get("intent") === "dismiss-velocity-alert") {
+    await db.shopSettings.update({
+      where: { shop },
+      data: { referralVelocityDismissedAt: new Date() },
     });
   }
 
@@ -140,7 +162,7 @@ function SetupStep({
 }
 
 export default function Dashboard() {
-  const { onboardingDismissed, hasCustomTiers, ratesReviewed, metrics, settings } =
+  const { onboardingDismissed, showVelocityAlert, hasCustomTiers, ratesReviewed, metrics, settings } =
     useLoaderData<typeof loader>();
   const fetcher = useFetcher();
 
@@ -207,6 +229,24 @@ export default function Dashboard() {
         Settings
       </s-button>
 
+      {showVelocityAlert ? (
+        <s-banner
+          heading="Unusual referral activity"
+          tone="warning"
+          dismissible
+          onDismiss={() =>
+            fetcher.submit({ intent: "dismiss-velocity-alert" }, { method: "POST" })
+          }
+        >
+          <s-stack direction="block" gap="small-200">
+            <s-paragraph>
+              Abnormal referral-code volume was detected. Review members and revoke
+              codes that look fraudulent.
+            </s-paragraph>
+            <s-link href="/app/customers">Review members</s-link>
+          </s-stack>
+        </s-banner>
+      ) : null}
       {!onboardingDismissed && (
         <s-section>
           <s-grid gridTemplateColumns="1fr auto" gap="small-400" alignItems="start">
@@ -364,6 +404,44 @@ export default function Dashboard() {
         </s-grid>
       </s-section>
 
+      <s-section padding="base">
+        <s-grid gap="base">
+          <s-heading>Program impact</s-heading>
+          <s-grid
+            gridTemplateColumns="@container (inline-size <= 400px) 1fr, 1fr auto 1fr"
+            gap="small"
+          >
+            <s-clickable href="/app/customers" paddingBlock="small-400" paddingInline="small-100" borderRadius="base">
+              <s-grid gap="small-300">
+                <s-heading>Repeat purchase rate</s-heading>
+                <s-text>
+                  {(metrics.repeatPurchaseRate * 100).toLocaleString(undefined, {
+                    maximumFractionDigits: 1,
+                  })}
+                  %
+                </s-text>
+                <s-text color="subdued">Members with more than one order</s-text>
+              </s-grid>
+            </s-clickable>
+            <s-divider direction="block" />
+            <s-clickable href="/app/customers" paddingBlock="small-400" paddingInline="small-100" borderRadius="base">
+              <s-grid gap="small-300">
+                <s-heading>Redemption of member GMV</s-heading>
+                <s-text>
+                  {(metrics.redemptionOfGmv * 100).toLocaleString(undefined, {
+                    maximumFractionDigits: 1,
+                  })}
+                  %
+                </s-text>
+                <s-text color="subdued">
+                  Discount value of redeemed points vs member lifetime spend
+                </s-text>
+              </s-grid>
+            </s-clickable>
+          </s-grid>
+        </s-grid>
+      </s-section>
+
       <s-section heading="How points work">
         <s-grid
           gridTemplateColumns="@container (inline-size <= 480px) 1fr, 1fr auto"
@@ -416,6 +494,15 @@ export default function Dashboard() {
             </s-link>
           </s-stack>
         </s-grid>
+      </s-section>
+
+      <s-section>
+        <s-stack alignItems="center">
+          <s-text>
+            Need help? Email{" "}
+            <s-link href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</s-link>.
+          </s-text>
+        </s-stack>
       </s-section>
     </s-page>
   );

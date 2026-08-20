@@ -10,6 +10,7 @@ const TYPE_LABELS = {
   REFUND_REVERSAL: "Refund",
   REFERRAL_BONUS: "Referral bonus",
   MANUAL_ADJUSTMENT: "Adjustment",
+  EXPIRE: "Expired",
 };
 
 export default async () => {
@@ -102,6 +103,9 @@ function Extension() {
   const balance = Number(data.pointsBalance || 0);
   const value = data.balanceValue != null ? data.balanceValue : balance / (data.redemptionRate || 1);
   const nextLine = nextTierLine(data);
+  const expiresInDays = Number(data.expiresInDays);
+  const showExpiryWarning =
+    Number(data.pointsBalance || 0) > 0 && expiresInDays > 0 && expiresInDays <= 30;
 
   return (
     <s-section heading="Your rewards">
@@ -112,6 +116,13 @@ function Extension() {
           <s-text color="subdued">Redeem from your cart before checkout.</s-text>
           {data.tierName ? <s-text>{data.tierName} tier</s-text> : null}
           {nextLine ? <s-text color="subdued">{nextLine}</s-text> : null}
+          {showExpiryWarning ? (
+            <s-banner tone="warning">
+              {expiresInDays === 1
+                ? "Your points expire in 1 day."
+                : `Your points expire in ${expiresInDays} days.`}
+            </s-banner>
+          ) : null}
         </s-stack>
 
         {data.history?.length ? (
