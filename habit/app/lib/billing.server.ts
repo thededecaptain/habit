@@ -1,5 +1,4 @@
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
-import { redirect } from "react-router";
 
 import { authenticate } from "../shopify.server";
 import { STANDARD_PLAN } from "./billing-plan";
@@ -29,7 +28,7 @@ export async function requireStandardPlan(request: Request) {
     return authenticate.admin(request);
   }
 
-  const { admin, billing, ...rest } = await authenticate.admin(request);
+  const { admin, billing, redirect, ...rest } = await authenticate.admin(request);
   const isTest = await shouldUseTestCharges(admin);
 
   await billing.require({
@@ -38,7 +37,7 @@ export async function requireStandardPlan(request: Request) {
     onFailure: async () => redirect("/app/billing"),
   });
 
-  return { admin, billing, ...rest, isTest };
+  return { admin, billing, redirect, ...rest, isTest };
 }
 
 export function trialEndsAt(createdAt: string, trialDays: number) {

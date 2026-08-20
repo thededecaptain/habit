@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { redirect, useFetcher, useLoaderData } from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -126,7 +126,7 @@ function parseOptionalHttpsUrl(value: FormDataEntryValue | null, label: string) 
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session, admin, billing } = await authenticate.admin(request);
+  const { session, admin, billing, redirect } = await authenticate.admin(request);
   const formData = await request.formData();
 
   if (formData.get("intent") === "cancel-subscription") {
