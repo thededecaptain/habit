@@ -1,25 +1,51 @@
 ---
 title: Checkout redemption
-description: Let customers apply points as a discount during Shopify checkout.
+description: Redeem points in the cart on every plan, or at checkout on Shopify Plus.
 ---
 
-Customers redeem points at checkout through Habit's checkout UI extension. You do not need Shopify Scripts.
+Customers redeem points as a checkout discount. You do not need Shopify Scripts. A Shopify Function applies the discount.
+
+## Where customers redeem
+
+| Surface | Who gets it |
+|---|---|
+| [Redeem points in cart](/storefront#redeem-in-the-cart) app embed or cart-page block | All Shopify plans |
+| Checkout UI extension | Shopify Plus only |
+
+The customer must be signed in. Guest checkouts cannot spend points or attach a referral code to a customer account.
 
 ## Customer flow
 
-1. The customer starts checkout while signed in.
-2. If their balance meets your minimum, they can apply points.
-3. Habit adds a discount for the redeemed amount, capped by your **max redemption percent**.
-4. On a successful order, those points leave the ledger.
+<Steps>
+  <Step title="Meet the minimum">
+    The balance must be at least **Minimum points to redeem**.
+  </Step>
+  <Step title="Apply points">
+    In cart (every plan) or checkout (Plus), the customer chooses how many points to spend. Habit caps that against **Max % of order payable with points** on the **subtotal**.
+  </Step>
+  <Step title="Pay">
+    On a successful paid order, those points leave the ledger. If both cart attributes and checkout metafields are set, the checkout value wins.
+  </Step>
+</Steps>
 
-## Check that it is on
+Referral codes use the same two surfaces. See [referrals](/program/referrals).
 
-Checkout extensions install with the app. If the redemption field is missing:
+## If redemption is missing
 
-1. Confirm Habit is installed and the trial or Standard plan is active.
-2. Place a test order while logged in as a customer with a points balance.
-3. If it still does not appear, email [support@gethabitloyalty.com](mailto:support@gethabitloyalty.com) with the shop domain.
+<Steps>
+  <Step title="Confirm billing">
+    A trial or Standard plan must be active so the app stays installed and the Function discount can run.
+  </Step>
+  <Step title="Confirm the cart embed">
+    On non-Plus stores, enable **Redeem points in cart** in theme **App embeds**. The checkout points field will not appear.
+  </Step>
+  <Step title="Test as a logged-in customer">
+    Place a test order with a customer account that has a points balance.
+  </Step>
+</Steps>
+
+If it still does not appear, email [support@gethabitloyalty.com](mailto:support@gethabitloyalty.com) with the shop domain.
 
 ## After a refund
 
-Refunding an order reverses points earned on that order. See [points](/program/points#refunds-reverse-points-automatically) for how the ledger behaves if those points were already spent.
+Refunding an order claws back a proportional share of points earned on that order. See [points](/program/points#refunds) if those points were already spent.

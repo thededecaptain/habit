@@ -1,0 +1,54 @@
+---
+title: Storefront and checkout
+description: Show balances on the storefront, redeem in cart or checkout, and enable the customer account block.
+---
+
+Habit ships three customer-facing pieces. Enable each one in the theme or customer accounts editor. None of them require editing theme code.
+
+## Loyalty points widget
+
+This is a theme app **block** (not an app embed). Add it to a section on product, home, or other templates.
+
+<Steps>
+  <Step title="Open the theme editor">
+    In Shopify admin, go to **Online Store → Themes** and click **Customize**.
+  </Step>
+  <Step title="Add the block">
+    Add an app block and choose **Loyalty points**. Place it where signed-in customers should see their balance, tier, and referral code.
+  </Step>
+  <Step title="Save">
+    Save the theme. Guests see a login prompt instead of a balance.
+  </Step>
+</Steps>
+
+## Redeem in the cart
+
+Cart drawers are not theme sections, so redeeming from the cart uses an **app embed**.
+
+<Steps>
+  <Step title="Open app embeds">
+    In the theme editor, open **App embeds**.
+  </Step>
+  <Step title="Enable Redeem points in cart">
+    Turn on **Redeem points in cart**. This injects the redeem widget next to the cart drawer or cart-page checkout button.
+  </Step>
+  <Step title="Save">
+    Save the theme. Signed-in customers with enough points can apply a discount before checkout. This path works on all Shopify plans.
+  </Step>
+</Steps>
+
+You can also add the **Redeem points** theme block on the cart page if you want the widget in a specific section instead of (or as well as) the embed.
+
+## Customer account rewards
+
+The **account-rewards** block shows balance, history, tier progress, and referral codes on the customer account profile.
+
+It targets the customer account profile. After install, confirm it is visible in **Checkout → Customer accounts** (or the customer account editor for your theme). Signed-in customers can request a referral code there.
+
+## Checkout redemption
+
+The checkout UI extension lets customers apply points and a referral code during Shopify checkout. Shopify only runs checkout UI extensions on **Shopify Plus**.
+
+On every plan, customers can still redeem from the cart as described above. At checkout, Habit applies the discount through a Shopify Function. If both a cart attribute and a checkout metafield are set, the checkout metafield wins.
+
+See [checkout redemption](/program/checkout) for the customer flow and troubleshooting.

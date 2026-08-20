@@ -1,0 +1,38 @@
+---
+title: Notifications
+description: Send loyalty events to Klaviyo, or to an HTTPS webhook if Klaviyo is not connected.
+---
+
+Habit can notify you when customers earn, redeem, refer, change tier, or have points about to expire. Configure this in **Settings → Notifications**.
+
+## Klaviyo
+
+<Steps>
+  <Step title="Create a private API key">
+    In Klaviyo, create a private API key with **events:write**.
+  </Step>
+  <Step title="Connect Habit">
+    Paste the key into **Klaviyo private API key** and click **Connect Klaviyo**. The key is stored encrypted and is never shown again.
+  </Step>
+  <Step title="Build flows">
+    Use these metrics in Klaviyo:
+  </Step>
+</Steps>
+
+- Habit: Points Earned
+- Habit: Tier Upgraded
+- Habit: Referral Sent
+- Habit: Referral Welcome Bonus
+- Habit: Points Redeemed
+- Habit: Points Expiring Soon
+- Habit: Points Expired
+
+Events only send when the customer has an email address. If the server encryption key is rotated, reconnect Klaviyo — stored keys cannot be decrypted with a new key. Webhook URLs are unaffected.
+
+Click **Disconnect** to stop sending to Klaviyo.
+
+## Optional webhook
+
+If Klaviyo is not connected, Habit POSTs JSON to **Optional notification webhook URL**. The body includes `eventName`, `customerEmail`, and `properties`.
+
+The webhook is a fallback. It is not used while Klaviyo is connected.

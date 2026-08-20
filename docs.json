@@ -16,7 +16,7 @@
     "groups": [
       {
         "group": "Getting started",
-        "pages": ["index", "getting-started"]
+        "pages": ["index", "getting-started", "storefront"]
       },
       {
         "group": "Your program",
@@ -29,7 +29,7 @@
       },
       {
         "group": "Account",
-        "pages": ["billing", "support"]
+        "pages": ["billing", "notifications", "support"]
       }
     ]
   },

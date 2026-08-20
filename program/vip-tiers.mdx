@@ -1,23 +1,30 @@
 ---
 title: VIP tiers
-description: Reward repeat customers with spend or order thresholds and higher earn rates.
+description: Reward repeat customers with spend or order thresholds and higher earn rates. Tiers never drop.
 ---
 
-VIP tiers let you give better earn rates to customers who hit a spend or order count you choose. Habit supports two or three tiers — enough to make status feel real without a complex rules engine.
+VIP tiers give a higher earn multiplier once a customer hits a lifetime spend or order count you choose. You can add as many tiers as you need. Members earn the base Settings rate until you create at least one tier.
 
 ## How tiers work
 
-1. Open **Tiers** in Habit.
-2. Set a name, threshold (spend or orders), and earn multiplier for each tier.
-3. Save. Habit evaluates each customer against those thresholds and assigns the highest matching tier.
+<Steps>
+  <Step title="Open Tiers">
+    In Habit, go to **Tiers**.
+  </Step>
+  <Step title="Add a tier">
+    Set a name, a minimum lifetime spend and/or minimum lifetime orders, an earn multiplier, and a sort order. You must set spend, orders, or both.
+  </Step>
+  <Step title="Save">
+    Habit assigns the qualifying tier with the **highest sort order**. Give better tiers a higher sort number so they win when a customer qualifies for more than one.
+  </Step>
+</Steps>
 
-A 1.5x multiplier on a 1-point-per-dollar program means a $40 order earns 60 points.
+A 1.5x multiplier on a 1-point-per-dollar program means a $40 **subtotal** earns 60 points.
+
+Tiers are based on lifetime spend and orders and **never drop**. Deleting a tier unassigns it; customers can qualify again on a later order.
+
+The order that crosses a threshold still earns at the previous multiplier. The new rate starts on the next paid order.
 
 ## What customers see
 
-Signed-in customers see their current tier on the storefront widget and in the account rewards block, when those embeds are enabled.
-
-## Tips
-
-- Keep thresholds reachable. A first tier that takes years to hit will not change buying habits.
-- Use multipliers, not a second currency. All rewards still live on the same points ledger.
+Signed-in customers see their current tier (and progress to the next) on the [loyalty widget](/storefront) and the customer account rewards block, when those are enabled.

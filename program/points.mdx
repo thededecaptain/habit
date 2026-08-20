@@ -1,30 +1,47 @@
 ---
 title: Points
-description: How customers earn points, redeem them, and what happens when you refund an order.
+description: How customers earn points on order subtotal, redeem them, and what refunds and expiry do to the balance.
 ---
 
-Every Habit program shares one points ledger. Purchases, referrals, and VIP multipliers all write to the same balance.
+Every Habit program shares one points ledger. Purchases, referrals, VIP multipliers, and manual adjustments all write to the same balance.
 
 ## Earn on purchase
 
-When an order is paid, Habit credits points using your **points per dollar** rate.
+When an order is paid, Habit credits points using **Points earned per $1 spent**, applied to the **order subtotal**. Tax and shipping do not earn points. VIP multipliers apply on top of that rate.
 
-Example: if the rate is 1 point per $1 and a customer spends $48, they earn 48 points. VIP multipliers apply on top of that rate.
+Example: if the rate is 1 point per $1 and the subtotal is $48, the customer earns 48 points at the 1x base rate.
 
-Points only post after the order is paid. Drafts and unpaid checkouts do not earn.
+The multiplier used is the customer’s **current** tier. If that order pushes them into a higher tier, the new multiplier starts on the next paid order.
 
-## Redeem at checkout
+Points only post after the order is paid. Drafts, unpaid checkouts, and guest orders with no customer do not earn.
 
-Customers spend points as a checkout discount. The conversion uses your **redemption rate** (points per $1 off), plus any minimum balance and maximum percent of the order you set.
+## Redeem
 
-See [checkout redemption](/program/checkout) for the customer flow.
+Customers spend points as a discount. Conversion uses **Points needed for $1 off**, plus your minimum balance and max percent of the **subtotal**.
 
-## Refunds reverse points automatically
+They can redeem:
 
-If you refund an order, Habit reverses the points that order earned. You do not need to adjust the ledger by hand.
+- In the **cart**, on every Shopify plan
+- At **checkout**, on Shopify Plus
 
-If those points were already spent, the customer's balance can go negative until future purchases cover it. Habit does not silently delete later redemptions.
+See [storefront and checkout](/storefront) and [checkout redemption](/program/checkout).
+
+## Refunds
+
+Refunding an order claws back points in proportion to the refunded amount versus the original subtotal. A full refund reverses the full earn for that order. A 50% refund reverses about half.
+
+You do not need to adjust the ledger by hand.
+
+If those points were already spent, the balance can go negative until future purchases cover it. Habit does not delete later redemptions.
 
 ## Points expiry
 
-Optionally set **points expiry days** in Settings. Unused points expire after that many days of inactivity. Leave the field empty to keep points indefinitely.
+Optionally set **Expire unused points after (days)** in Settings. Unused points expire after that many days with no earn-on-order or redemption. The whole balance expires together — this is not oldest-points-first.
+
+Leave the field empty to keep points indefinitely. Referral bonuses and [manual adjustments](#manual-adjustments) do not reset the expiry clock.
+
+## Manual adjustments
+
+Open **Customers** in Habit, pick a member, and add or subtract points. A reason is required. Use a negative number to subtract.
+
+Manual adjustments appear in the member’s history as an adjustment. They change the balance immediately but do not count as purchase activity for expiry.

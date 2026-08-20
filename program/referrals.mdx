@@ -1,6 +1,6 @@
 ---
 title: Referrals
-description: Reward both the referrer and the new customer from the same points ledger.
+description: Reward both the referrer and the new customer from the same points ledger, with code limits and velocity alerts.
 ---
 
 Referrals in Habit use the same points ledger as purchases. You do not install a second app or pay a second fee.
@@ -11,19 +11,31 @@ In **Settings**, configure:
 
 | Setting | What it controls |
 |---|---|
-| Referrer bonus | Points the existing customer earns when a referral converts |
-| Referee bonus | Points the new customer earns for using a valid code |
-| Code expiry | How many days an unused code stays valid |
-| Max active codes | How many unused codes one customer can have at once |
+| Bonus points for the referrer | Points the existing customer earns when a friend’s first paid order converts |
+| Bonus points for the new customer | Welcome points for the new customer |
+| Referral code expiry (days) | How long an unused code stays valid |
+| Max active referral codes per member | Cap on unused codes one customer can generate |
+| Alert after this many codes shop-wide | Dashboard banner when creation volume is high |
+| Velocity window (minutes) | Time window for that alert |
 
 ## How a referral converts
 
-1. A customer shares their referral code from the storefront widget or account page.
-2. A new customer applies the code.
-3. When that order is paid, Habit credits both bonuses.
+<Steps>
+  <Step title="Share a code">
+    A signed-in customer gets a code from the storefront widget or the customer account rewards block.
+  </Step>
+  <Step title="Apply it">
+    The new customer applies the code in the cart redeem widget or, on Shopify Plus, at checkout.
+  </Step>
+  <Step title="First paid order">
+    When that customer’s first paid order goes through, Habit credits both bonuses. A customer can redeem only one referral code. Self-referrals are rejected.
+  </Step>
+</Steps>
+
+Invalid, expired, or already-used codes are ignored at order time. The customer sees the error when they try to apply the code.
 
 ## Fraud protection
 
-Habit rate-limits code generation, expires unused codes, and alerts you when referral volume looks abnormal. Tune **referral velocity** in Settings if you sell into a market that attracts coupon-site scraping.
+Habit caps unused codes per member, expires unused codes, and shows a dashboard banner when shop-wide code creation exceeds your velocity threshold.
 
-This will not catch every case, but it stops the failure mode where thousands of codes leak overnight with no way to shut them off.
+This will not catch every case, but it stops thousands of codes leaking overnight with no way to notice.

@@ -1,40 +1,53 @@
 ---
 title: Install Habit
-description: Install the app, configure your loyalty program, and show points on the storefront.
+description: Install the app, start a trial, and configure earn, redeem, and referral rates.
 ---
 
-You can get a working program live in one sitting: install the app, set earn and redeem rates, then enable the storefront widget.
+You can get a working program live in one sitting: install Habit, start the trial, set your rates, then turn on the storefront pieces.
 
-## Install from Shopify
+## Install and start billing
 
-1. Open Habit in the Shopify App Store and click **Install**.
-2. Review the permissions, then approve the install.
-3. Habit opens inside your Shopify admin. Start a 14-day trial of the Standard plan, or go to **Billing** later.
+<Steps>
+  <Step title="Install the app">
+    Open Habit in the Shopify App Store and click **Install**. Review the permissions, then approve.
+  </Step>
+  <Step title="Start the trial">
+    Habit opens in Shopify admin. Go to **Billing** and start the 14-day Standard trial. Admin screens stay locked until a trial or paid plan is active.
+  </Step>
+</Steps>
+
+Cancel later from **Settings**, not from Billing. See [billing and cancel](/billing).
 
 ## Configure your program
 
-Open **Settings** in Habit and set:
+Open **Settings** and save when you are done. Habit syncs these values to the storefront widget, cart, and checkout.
+
+### Earning and redeeming
 
 | Setting | What it controls |
 |---|---|
-| Points per dollar | How many points a customer earns per $1 spent |
-| Redemption rate | How many points equal $1 off at checkout |
-| Minimum redeemable points | The smallest balance a customer can spend |
-| Max redemption percent | Caps how much of an order can be paid with points |
+| Points earned per $1 spent | Points credited on the **order subtotal** (not tax or shipping), before VIP multipliers |
+| Points needed for $1 off | How many points equal $1 of discount |
+| Minimum points to redeem | Smallest balance a customer can spend |
+| Max % of order payable with points | Cap against the order **subtotal** |
 
-Save your changes. Habit syncs these values to the storefront widget and checkout.
+### Referrals
 
-## Show points on the storefront
+| Setting | What it controls |
+|---|---|
+| Bonus points for the referrer | Points the existing customer earns when a friend’s first paid order converts |
+| Bonus points for the new customer | Points the new customer earns for using a valid code |
+| Referral code expiry (days) | How long an unused code stays valid |
+| Max active referral codes per member | How many unused codes one customer can hold |
+| Alert after this many codes shop-wide | Dashboard banner when code creation volume is high |
+| Velocity window (minutes) | Time window for that shop-wide alert |
 
-1. In Shopify admin, go to **Online Store → Themes**.
-2. Click **Customize** on your live theme.
-3. Open **App embeds** and enable the Habit points widget.
-4. Save the theme.
+### Points expiry
 
-Customers who are signed in can then see their balance without editing theme code.
+Leave **Expire unused points after (days)** blank to keep points indefinitely. If you set a number, the whole balance expires together after that many days with no earn-on-order or redemption. Referral bonuses and manual adjustments do not reset the clock.
 
 ## Next steps
 
-- Tune [points](/program/points) and [VIP tiers](/program/vip-tiers)
-- Turn on [referrals](/program/referrals)
-- Confirm [checkout redemption](/program/checkout) works on a test order
+- Turn on the [storefront widget, cart redeem, and account block](/storefront)
+- Add [VIP tiers](/program/vip-tiers)
+- Connect [Klaviyo or a webhook](/notifications) if you want email flows
