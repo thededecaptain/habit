@@ -33,7 +33,7 @@
     var loggedInEl = root.querySelector("[data-habit-loggedin]");
     var guestEl = root.querySelector("[data-habit-guest]");
 
-    fetch(proxyUrl + "/balance" + window.location.search)
+    fetch(proxyUrl + "/balance")
       .then(function (res) {
         return res.json();
       })

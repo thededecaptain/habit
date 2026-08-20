@@ -5,14 +5,14 @@ import db from "../db.server";
 const REDEMPTION_FUNCTION_HANDLE = "points-redemption";
 
 /**
- * Pushes the redemption rate + cap into a shop metafield so the
- * points-redemption Shopify Function (which can't call our API — Functions
- * have no network access) can read current settings at checkout time.
+ * Pushes earn/redemption rates into a shop metafield so the
+ * points-redemption Shopify Function and the storefront widget can read
+ * them without calling our API.
  */
 export async function syncLoyaltySettingsMetafield(
   admin: AdminApiContext,
   shop: string,
-  settings: Pick<ShopSettings, "redemptionRate" | "maxRedemptionPercent">,
+  settings: Pick<ShopSettings, "pointsPerDollar" | "redemptionRate" | "maxRedemptionPercent">,
 ) {
   const shopResponse = await admin.graphql(`#graphql
     query ShopId { shop { id } }
@@ -33,10 +33,10 @@ export async function syncLoyaltySettingsMetafield(
         metafields: [
           {
             ownerId: shopGid,
-            namespace: "$app",
             key: "loyalty_settings",
             type: "json",
             value: JSON.stringify({
+              pointsPerDollar: Number(settings.pointsPerDollar),
               redemptionRate: Number(settings.redemptionRate),
               maxRedemptionPercent: Number(settings.maxRedemptionPercent),
             }),

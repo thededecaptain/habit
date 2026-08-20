@@ -64,7 +64,7 @@
         ? Number(cart.attributes.points_to_redeem)
         : Number(root.getAttribute("data-applied-points") || 0);
 
-    fetch(proxy + "/balance" + window.location.search)
+    fetch(proxy + "/balance")
       .then(function (r) {
         return r.json();
       })

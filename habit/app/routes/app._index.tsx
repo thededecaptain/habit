@@ -176,7 +176,8 @@ export default function Dashboard() {
     },
     {
       title: "Add the product widget",
-      description: "Shows balance, what this product earns, and a link to redeem in cart.",
+      description:
+        "Add it on product pages only — not the header. It shows balance, what this product earns, and a link to redeem in cart.",
       done: false,
       actionHref: THEME_EDITOR,
       actionLabel: "Open theme editor",
@@ -483,7 +484,8 @@ export default function Dashboard() {
           alignItems="center"
         >
           <s-paragraph>
-            Show balances on product pages, and let members redeem from the cart drawer.
+            Show balances on product pages only, and let members redeem from the
+            cart drawer. Do not add the widget to the site header.
           </s-paragraph>
           <s-stack direction="inline" gap="small-200">
             <s-link href={THEME_EDITOR} target="_blank">

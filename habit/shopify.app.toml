@@ -45,3 +45,12 @@ redirect_urls = [
 url = "https://habit-production-9257.up.railway.app/proxy"
 subpath = "habit"
 prefix = "apps"
+
+[shop.metafields.app.loyalty_settings]
+type = "json"
+name = "Loyalty settings"
+description = "Earn and redemption rates for the Habit widget and checkout function."
+
+[shop.metafields.app.loyalty_settings.access]
+admin = "merchant_read"
+storefront = "public_read"

@@ -1,63 +1,87 @@
 {{ 'points-widget.css' | asset_url | stylesheet_tag }}
 
+{% liquid
+  assign habit_settings = shop.metafields.app.loyalty_settings.value
+  assign points_per_dollar = habit_settings.pointsPerDollar | default: 1 | times: 1.0
+  assign price_cents = 0
+  if product
+    assign price_cents = product.selected_or_first_available_variant.price | default: product.price | default: 0
+  endif
+  assign earn_points = price_cents | times: points_per_dollar | divided_by: 100.0 | floor
+%}
+
 <div
   class="habit-widget"
-  data-habit-widget
+  {% if customer %}data-habit-widget{% endif %}
   data-proxy-url="/apps/habit"
-  data-product-price-cents="{% if product %}{{ product.selected_or_first_available_variant.price | default: product.price }}{% else %}0{% endif %}"
+  data-product-price-cents="{{ price_cents }}"
   style="
     {% if block.settings.accent_color != blank and block.settings.accent_color != '#121212' %}--habit-accent: {{ block.settings.accent_color }};{% endif %}
     --habit-radius: {{ block.settings.corner_radius }}px;
   "
   {{ block.shopify_attributes }}
 >
-  <div data-habit-loading class="habit-widget__state">
-    <p>{{ block.settings.loading_text | default: 'Loading your rewards…' }}</p>
-  </div>
+  {% if customer %}
+    <div data-habit-loading class="habit-widget__state">
+      <p>{{ block.settings.loading_text | default: 'Loading your rewards…' }}</p>
+    </div>
 
-  <div data-habit-loggedin class="habit-widget__state" hidden>
-    <p class="habit-widget__eyebrow">{{ block.settings.heading | default: 'Your rewards' }}</p>
-    <p class="habit-widget__balance">
-      <span data-habit-balance>0</span>
-      <span class="habit-widget__balance-label">points</span>
-      <span class="habit-widget__value" data-habit-value hidden></span>
-    </p>
-    <p class="habit-widget__context" data-habit-context hidden></p>
-    <p class="habit-widget__tier" data-habit-tier hidden></p>
-    <p class="habit-widget__next-tier" data-habit-next-tier hidden></p>
-    <p class="habit-widget__expiry" data-habit-expiry hidden></p>
-    <a class="habit-widget__cta" data-habit-cart-link href="{{ routes.cart_url }}">
-      {{ block.settings.redeem_hint | default: 'Redeem in cart' }}
-    </a>
-
-    <details class="habit-widget__referral">
-      <summary>{{ block.settings.referral_summary | default: 'Share with friends' }}</summary>
-      <p class="habit-widget__next-tier">
-        {{ block.settings.referral_text | default: 'Give friends your code. They get a bonus on their first order, and so do you.' }}
+    <div data-habit-loggedin class="habit-widget__state" hidden>
+      <p class="habit-widget__eyebrow">{{ block.settings.heading | default: 'Your rewards' }}</p>
+      <p class="habit-widget__balance">
+        <span data-habit-balance>0</span>
+        <span class="habit-widget__balance-label">points</span>
+        <span class="habit-widget__value" data-habit-value hidden></span>
       </p>
-      <div class="habit-widget__referral-row">
-        <code data-habit-referral-code>—</code>
-        <button type="button" data-habit-get-code class="habit-widget__button habit-widget__button--inline">
-          {{ block.settings.get_code_text | default: 'Get my code' }}
-        </button>
-        <button type="button" data-habit-copy-code class="habit-widget__button habit-widget__button--inline" hidden>
-          {{ block.settings.copy_text | default: 'Copy code' }}
-        </button>
-      </div>
-      <p class="habit-widget__status" data-habit-referral-status role="status"></p>
-    </details>
-  </div>
+      <p class="habit-widget__context" data-habit-context hidden></p>
+      <p class="habit-widget__tier" data-habit-tier hidden></p>
+      <p class="habit-widget__next-tier" data-habit-next-tier hidden></p>
+      <p class="habit-widget__expiry" data-habit-expiry hidden></p>
+      <a class="habit-widget__cta" data-habit-cart-link href="{{ routes.cart_url }}">
+        {{ block.settings.redeem_hint | default: 'Redeem in cart' }}
+      </a>
 
-  <div data-habit-guest class="habit-widget__state" hidden>
-    <p class="habit-widget__eyebrow">{{ block.settings.heading | default: 'Your rewards' }}</p>
-    <p class="habit-widget__context" data-habit-guest-context></p>
-    <p>
-      <a href="{{ routes.account_login_url }}">{{ block.settings.login_link_text | default: 'Log in to start earning' }}</a>
-    </p>
-  </div>
+      <details class="habit-widget__referral">
+        <summary>{{ block.settings.referral_summary | default: 'Share with friends' }}</summary>
+        <p class="habit-widget__next-tier">
+          {{ block.settings.referral_text | default: 'Give friends your code. They get a bonus on their first order, and so do you.' }}
+        </p>
+        <div class="habit-widget__referral-row">
+          <code data-habit-referral-code>—</code>
+          <button type="button" data-habit-get-code class="habit-widget__button habit-widget__button--inline">
+            {{ block.settings.get_code_text | default: 'Get my code' }}
+          </button>
+          <button type="button" data-habit-copy-code class="habit-widget__button habit-widget__button--inline" hidden>
+            {{ block.settings.copy_text | default: 'Copy code' }}
+          </button>
+        </div>
+        <p class="habit-widget__status" data-habit-referral-status role="status"></p>
+      </details>
+    </div>
+  {% else %}
+    <div data-habit-guest class="habit-widget__state">
+      <p class="habit-widget__eyebrow">{{ block.settings.heading | default: 'Your rewards' }}</p>
+      <p class="habit-widget__context" data-habit-guest-context>
+        {%- if earn_points > 0 -%}
+          Earn ~{{ earn_points }} points on this product.
+        {%- endif -%}
+        {%- if points_per_dollar > 0 -%}
+          {%- if earn_points > 0 %} {% endif -%}
+          Earn {{ points_per_dollar }} point{% if points_per_dollar != 1 %}s{% endif %} per $1 spent.
+        {%- else -%}
+          Earn points on purchase.
+        {%- endif -%}
+      </p>
+      <p>
+        <a href="{{ routes.account_login_url }}">{{ block.settings.login_link_text | default: 'Log in to start earning' }}</a>
+      </p>
+    </div>
+  {% endif %}
 </div>
 
-<script src="{{ 'points-widget.js' | asset_url }}" defer></script>
+{% if customer %}
+  <script src="{{ 'points-widget.js' | asset_url }}" defer></script>
+{% endif %}
 
 {% schema %}
 {
