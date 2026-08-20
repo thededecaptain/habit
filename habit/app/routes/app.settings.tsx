@@ -570,6 +570,7 @@ export default function Settings() {
             error={errors.referralVelocityWindowMinutes}
             min={1}
             step={1}
+            details="Rolling time window for the shop-wide code-creation alert above."
           />
         </s-stack>
       </s-section>
