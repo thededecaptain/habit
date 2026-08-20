@@ -1,12 +1,14 @@
-import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
-import type { LinksFunction } from "react-router";
+import type { ReactNode } from "react";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, useRouteError } from "react-router";
+import type { HeadersFunction, LinksFunction } from "react-router";
+import { boundary } from "@shopify/shopify-app-react-router/server";
 
 export const links: LinksFunction = () => [
   { rel: "icon", type: "image/png", href: "/favicon.png" },
   { rel: "apple-touch-icon", href: "/favicon.png" },
 ];
 
-export default function App() {
+export function Layout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
@@ -21,10 +23,22 @@ export default function App() {
         <Links />
       </head>
       <body>
-        <Outlet />
+        {children}
         <ScrollRestoration />
         <Scripts />
       </body>
     </html>
   );
 }
+
+export default function App() {
+  return <Outlet />;
+}
+
+export function ErrorBoundary() {
+  return boundary.error(useRouteError());
+}
+
+export const headers: HeadersFunction = (headersArgs) => {
+  return boundary.headers(headersArgs);
+};
