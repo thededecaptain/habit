@@ -34,9 +34,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     cancelled,
     amount: STANDARD_PLAN_AMOUNT,
     trialDays: STANDARD_PLAN_TRIAL_DAYS,
-    // Draft plans can be tested on same-org dev stores. Do not auto-redirect:
-    // the hosted URL 404s until Enable, and that dumps merchants on Apps.
-    showHostedPlan: shopContext.partnerDevelopment || useHostedPlanPage(),
+    // Only after the real app handle is live and SHOPIFY_APP_PRICING is on.
+    // /charges/habit 404s (handle is taken) and dumps merchants on Apps.
+    showHostedPlan: useHostedPlanPage(),
   };
 };
 

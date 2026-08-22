@@ -4,7 +4,7 @@ export const STANDARD_PLAN_CURRENCY = "USD";
 export const STANDARD_PLAN_TRIAL_DAYS = 30;
 
 /** App Store / hosted plan-page handle. Override with SHOPIFY_APP_HANDLE. */
-export const APP_HANDLE = process.env.SHOPIFY_APP_HANDLE || "habit";
+export const APP_HANDLE = process.env.SHOPIFY_APP_HANDLE || "habit-loyalty";
 
 /** Draft / public plan handle in Partner Dashboard Pricing. */
 export const STANDARD_PLAN_HANDLE =
