@@ -268,25 +268,19 @@ export default function Dashboard() {
                   Points, VIP tiers, and referrals in one ledger. Members earn on purchase and
                   redeem at checkout.
                 </s-paragraph>
-                <s-stack direction="inline" gap="small-200">
+                <s-stack direction="inline" gap="small-200" alignItems="center">
                   {nextStep ? (
                     isExternalAdminHref(nextStep.actionHref) ? (
                       <s-link href={nextStep.actionHref} target="_blank">
                         {nextStep.actionLabel}
                       </s-link>
                     ) : (
-                      <s-button variant="primary" href={nextStep.actionHref}>
-                        {nextStep.actionLabel}
-                      </s-button>
+                      <s-link href={nextStep.actionHref}>{nextStep.actionLabel}</s-link>
                     )
                   ) : (
-                    <s-button variant="primary" href="/app/customers">
-                      View members
-                    </s-button>
+                    <s-link href="/app/customers">View members</s-link>
                   )}
-                  <s-button tone="neutral" variant="tertiary" href="/app/settings">
-                    Review rates
-                  </s-button>
+                  <s-link href="/app/settings">Review rates</s-link>
                 </s-stack>
               </s-grid>
               <s-stack alignItems="center">
