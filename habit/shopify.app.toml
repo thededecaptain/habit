@@ -2,7 +2,6 @@
 
 client_id = "d4f4bcdc36a90b4443c2e6fde31bbd80"
 name = "Habit"
-handle = "habit"
 application_url = "https://habit-production-9257.up.railway.app/app"
 embedded = true
 
