@@ -21,7 +21,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   await db.customer.update({
     where: { id: customer.id },
-    data: { email: null },
+    data: { email: null, displayName: null },
   });
 
   return new Response();

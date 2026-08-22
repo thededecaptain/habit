@@ -16,7 +16,7 @@ import {
   redirectToSubscribe,
   shouldUseTestCharges,
 } from "../lib/billing.server";
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "../lib/brand";
+import { PRIVACY_URL, SUPPORT_EMAIL, SUPPORT_MAILTO, TERMS_URL } from "../lib/brand";
 import { EncryptionConfigError, encryptSecret } from "../lib/secrets.server";
 
 // Keep these names in the route so the settings UI can list them without
@@ -32,6 +32,38 @@ const KLAVIYO_METRIC_NAMES = [
 ] as const;
 
 const SAVE_BAR_ID = "settings-save-bar";
+
+function formatSettingNumber(value: unknown) {
+  const n = Number(value);
+  return Number.isFinite(n) ? String(n) : "";
+}
+
+function fieldInputValue(event: {
+  currentTarget?: { value?: unknown } | null;
+  target?: { value?: unknown } | null;
+  detail?: { value?: unknown } | null;
+}) {
+  const raw =
+    event.currentTarget?.value ?? event.target?.value ?? event.detail?.value ?? "";
+  return raw == null ? "" : String(raw);
+}
+
+/** Polaris number fields reset if React re-sets defaultValue after each keystroke. */
+function StableNumberField({
+  resetToken,
+  defaultValue,
+  ...props
+}: Record<string, unknown> & { resetToken: number; defaultValue: string }) {
+  return <FrozenNumberField key={resetToken} defaultValue={defaultValue} {...props} />;
+}
+
+function FrozenNumberField({
+  defaultValue,
+  ...props
+}: Record<string, unknown> & { defaultValue: string }) {
+  const initial = useRef(defaultValue);
+  return <s-number-field {...props} defaultValue={initial.current} />;
+}
 
 type FormState = {
   pointsPerDollar: string;
@@ -55,17 +87,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const access = await findPaidAccess(billing, shopContext, admin);
 
   const values: FormState = {
-    pointsPerDollar: String(settings.pointsPerDollar),
-    redemptionRate: String(settings.redemptionRate),
-    minRedeemablePoints: String(settings.minRedeemablePoints),
-    maxRedemptionPercent: String(settings.maxRedemptionPercent),
-    referrerBonusPoints: String(settings.referrerBonusPoints),
-    refereeBonusPoints: String(settings.refereeBonusPoints),
-    referralCodeExpiryDays: String(settings.referralCodeExpiryDays),
-    maxActiveReferralCodesPerCustomer: String(settings.maxActiveReferralCodesPerCustomer),
-    referralVelocityThreshold: String(settings.referralVelocityThreshold),
-    referralVelocityWindowMinutes: String(settings.referralVelocityWindowMinutes),
-    pointsExpiryDays: settings.pointsExpiryDays != null ? String(settings.pointsExpiryDays) : "",
+    pointsPerDollar: formatSettingNumber(settings.pointsPerDollar),
+    redemptionRate: formatSettingNumber(settings.redemptionRate),
+    minRedeemablePoints: formatSettingNumber(settings.minRedeemablePoints),
+    maxRedemptionPercent: formatSettingNumber(settings.maxRedemptionPercent),
+    referrerBonusPoints: formatSettingNumber(settings.referrerBonusPoints),
+    refereeBonusPoints: formatSettingNumber(settings.refereeBonusPoints),
+    referralCodeExpiryDays: formatSettingNumber(settings.referralCodeExpiryDays),
+    maxActiveReferralCodesPerCustomer: formatSettingNumber(
+      settings.maxActiveReferralCodesPerCustomer,
+    ),
+    referralVelocityThreshold: formatSettingNumber(settings.referralVelocityThreshold),
+    referralVelocityWindowMinutes: formatSettingNumber(
+      settings.referralVelocityWindowMinutes,
+    ),
+    pointsExpiryDays:
+      settings.pointsExpiryDays != null
+        ? formatSettingNumber(settings.pointsExpiryDays)
+        : "",
     notificationWebhookUrl: settings.notificationWebhookUrl ?? "",
   };
 
@@ -331,7 +370,7 @@ export default function Settings() {
   // every keystroke), not onChange (only fires on blur, which can race with
   // a Save button click before React state catches up).
   const update = (key: keyof FormState) => (event: any) => {
-    setForm((prev) => ({ ...prev, [key]: event.currentTarget?.value ?? "" }));
+    setForm((prev) => ({ ...prev, [key]: fieldInputValue(event) }));
     setEditedSinceSubmit((prev) => new Set(prev).add(key));
   };
 
@@ -428,15 +467,15 @@ export default function Settings() {
 
       <s-section heading="Earning points">
         <s-stack direction="block" gap="base">
-          <s-number-field
-            key={`pointsPerDollar-${resetKey}`}
+          <StableNumberField
+            resetToken={resetKey}
             label="Points earned per $1 spent"
             name="pointsPerDollar"
             defaultValue={values.pointsPerDollar}
             onInput={update("pointsPerDollar")}
             error={errors.pointsPerDollar}
             min={0}
-            step={0.5}
+            step={0.01}
             details="Applied to the order subtotal, before VIP tier multipliers."
           />
           <s-paragraph color="subdued">
@@ -475,8 +514,8 @@ export default function Settings() {
 
       <s-section heading="Redeeming points">
         <s-stack direction="block" gap="base">
-          <s-number-field
-            key={`redemptionRate-${resetKey}`}
+          <StableNumberField
+            resetToken={resetKey}
             label="Points needed for $1 off"
             name="redemptionRate"
             defaultValue={values.redemptionRate}
@@ -484,8 +523,8 @@ export default function Settings() {
             error={errors.redemptionRate}
             min={0}
           />
-          <s-number-field
-            key={`minRedeemablePoints-${resetKey}`}
+          <StableNumberField
+            resetToken={resetKey}
             label="Minimum points to redeem"
             name="minRedeemablePoints"
             defaultValue={values.minRedeemablePoints}
@@ -494,8 +533,8 @@ export default function Settings() {
             min={0}
             step={1}
           />
-          <s-number-field
-            key={`maxRedemptionPercent-${resetKey}`}
+          <StableNumberField
+            resetToken={resetKey}
             label="Max % of order payable with points"
             name="maxRedemptionPercent"
             defaultValue={values.maxRedemptionPercent}
@@ -510,8 +549,8 @@ export default function Settings() {
 
       <s-section heading="Referrals">
         <s-stack direction="block" gap="base">
-          <s-number-field
-            key={`referrerBonusPoints-${resetKey}`}
+          <StableNumberField
+            resetToken={resetKey}
             label="Bonus points for the referrer"
             name="referrerBonusPoints"
             defaultValue={values.referrerBonusPoints}
@@ -520,8 +559,8 @@ export default function Settings() {
             min={0}
             step={1}
           />
-          <s-number-field
-            key={`refereeBonusPoints-${resetKey}`}
+          <StableNumberField
+            resetToken={resetKey}
             label="Bonus points for the new customer"
             name="refereeBonusPoints"
             defaultValue={values.refereeBonusPoints}
@@ -530,8 +569,8 @@ export default function Settings() {
             min={0}
             step={1}
           />
-          <s-number-field
-            key={`referralCodeExpiryDays-${resetKey}`}
+          <StableNumberField
+            resetToken={resetKey}
             label="Referral code expiry (days)"
             name="referralCodeExpiryDays"
             defaultValue={values.referralCodeExpiryDays}
@@ -540,8 +579,8 @@ export default function Settings() {
             min={1}
             step={1}
           />
-          <s-number-field
-            key={`maxActiveReferralCodesPerCustomer-${resetKey}`}
+          <StableNumberField
+            resetToken={resetKey}
             label="Max active referral codes per member"
             name="maxActiveReferralCodesPerCustomer"
             defaultValue={values.maxActiveReferralCodesPerCustomer}
@@ -551,8 +590,8 @@ export default function Settings() {
             step={1}
             details="Basic fraud protection: caps how many unused codes a member can generate."
           />
-          <s-number-field
-            key={`referralVelocityThreshold-${resetKey}`}
+          <StableNumberField
+            resetToken={resetKey}
             label="Alert after this many codes shop-wide"
             name="referralVelocityThreshold"
             defaultValue={values.referralVelocityThreshold}
@@ -562,8 +601,8 @@ export default function Settings() {
             step={1}
             details="Triggers a dashboard banner when this many referral codes are created in the window below."
           />
-          <s-number-field
-            key={`referralVelocityWindowMinutes-${resetKey}`}
+          <StableNumberField
+            resetToken={resetKey}
             label="Velocity window (minutes)"
             name="referralVelocityWindowMinutes"
             defaultValue={values.referralVelocityWindowMinutes}
@@ -578,8 +617,8 @@ export default function Settings() {
 
       <s-section heading="Points expiry">
         <s-stack direction="block" gap="base">
-          <s-number-field
-            key={`pointsExpiryDays-${resetKey}`}
+          <StableNumberField
+            resetToken={resetKey}
             label="Expire unused points after (days)"
             name="pointsExpiryDays"
             defaultValue={values.pointsExpiryDays}
@@ -664,7 +703,10 @@ export default function Settings() {
         <s-stack alignItems="center">
           <s-text>
             Need help? Email{" "}
-            <s-link href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</s-link>.
+            <s-link href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</s-link>.{" "}
+            <s-link href={PRIVACY_URL}>Privacy</s-link>
+            {" · "}
+            <s-link href={TERMS_URL}>Terms</s-link>
           </s-text>
         </s-stack>
       </s-section>
