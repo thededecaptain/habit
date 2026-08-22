@@ -10,6 +10,7 @@ import { ensureRedemptionDiscount, syncLoyaltySettingsMetafield } from "../lib/d
 import {
   STANDARD_PLAN,
   STANDARD_PLAN_AMOUNT,
+  STANDARD_PLAN_TRIAL_DAYS,
   shouldUseTestCharges,
   trialEndsAt,
 } from "../lib/billing.server";
@@ -78,6 +79,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     values,
     klaviyoConnected: Boolean(settings.klaviyoEnabled && settings.klaviyoApiKeyEncrypted),
     amount: STANDARD_PLAN_AMOUNT,
+    trialDays: STANDARD_PLAN_TRIAL_DAYS,
     subscription: subscription
       ? {
           status: subscription.status,
@@ -263,7 +265,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Settings() {
-  const { values, klaviyoConnected, amount, subscription } = useLoaderData<typeof loader>();
+  const { values, klaviyoConnected, amount, trialDays, subscription } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const billingFetcher = useFetcher();
   const notifyFetcher = useFetcher<typeof action>();
@@ -372,7 +374,7 @@ export default function Settings() {
             </s-paragraph>
           ) : (
             <s-paragraph color="subdued">
-              Start a 14-day free trial to keep Habit running.
+              Start a {trialDays}-day free trial to keep Habit running.
             </s-paragraph>
           )}
           {subscription ? (
