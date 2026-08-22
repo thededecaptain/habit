@@ -18,9 +18,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const params = url.searchParams;
 
-  // Shopify admin loads application_url in an iframe. Never render the public
-  // marketing page there — bounce into the embedded app instead.
-  if (params.get("shop") || params.get("host") || params.get("embedded")) {
+  // Shopify admin loads application_url in an iframe. App Pricing welcome
+  // links may also land here with only plan_handle (draft Redirect URL is /).
+  if (
+    params.get("shop") ||
+    params.get("host") ||
+    params.get("embedded") ||
+    params.get("plan_handle") ||
+    params.get("charge_id")
+  ) {
     throw redirect(`/app?${params.toString()}`);
   }
 
@@ -33,7 +39,7 @@ export default function App() {
 
   useEffect(() => {
     if (window.self !== window.top) {
-      window.location.replace("/app");
+      window.location.replace(`/app${window.location.search}`);
       return;
     }
     setShowLanding(true);

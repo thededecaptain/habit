@@ -90,6 +90,10 @@ model ShopSettings {
   // Null until successfully created via discountAutomaticAppCreate.
   discountAutomaticId String?
 
+  // Shopify App Pricing welcome/webhook grant. Used when Partner API is unset.
+  appPricingPlanHandle String?
+  appPricingGrantedAt  DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

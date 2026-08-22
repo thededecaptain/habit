@@ -8,11 +8,13 @@ import db from "../db.server";
 import { getOrCreateShopSettings } from "../lib/ledger.server";
 import { ensureRedemptionDiscount, syncLoyaltySettingsMetafield } from "../lib/discount.server";
 import {
-  STANDARD_PLAN,
   STANDARD_PLAN_AMOUNT,
   STANDARD_PLAN_TRIAL_DAYS,
+  clearAppPricingGrant,
+  findPaidAccess,
+  loadShopBillingContext,
+  redirectToSubscribe,
   shouldUseTestCharges,
-  trialEndsAt,
 } from "../lib/billing.server";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "../lib/brand";
 import { EncryptionConfigError, encryptSecret } from "../lib/secrets.server";
@@ -49,16 +51,8 @@ type FormState = {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin, billing } = await authenticate.admin(request);
   const settings = await getOrCreateShopSettings(session.shop);
-  const isTest = await shouldUseTestCharges(admin);
-  const check = await billing.check({
-    plans: [STANDARD_PLAN],
-    isTest,
-  });
-  const subscription = check.appSubscriptions[0] ?? null;
-  const trialEnd = subscription
-    ? trialEndsAt(subscription.createdAt, subscription.trialDays)
-    : null;
-  const inTrial = trialEnd ? Date.now() < trialEnd.getTime() : false;
+  const shopContext = await loadShopBillingContext(admin, session.shop);
+  const access = await findPaidAccess(billing, shopContext, admin);
 
   const values: FormState = {
     pointsPerDollar: String(settings.pointsPerDollar),
@@ -80,12 +74,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     klaviyoConnected: Boolean(settings.klaviyoEnabled && settings.klaviyoApiKeyEncrypted),
     amount: STANDARD_PLAN_AMOUNT,
     trialDays: STANDARD_PLAN_TRIAL_DAYS,
-    subscription: subscription
+    subscription: access
       ? {
-          status: subscription.status,
-          inTrial,
-          trialEndsAt: trialEnd?.toISOString() ?? null,
-          currentPeriodEnd: subscription.currentPeriodEnd,
+          source: access.source,
+          status: access.status,
+          inTrial: access.inTrial,
+          trialEndsAt: access.trialEndsAt,
+          currentPeriodEnd: access.currentPeriodEnd,
         }
       : null,
   };
@@ -132,20 +127,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
 
   if (formData.get("intent") === "cancel-subscription") {
-    const isTest = await shouldUseTestCharges(admin);
-    const check = await billing.check({
-      plans: [STANDARD_PLAN],
-      isTest,
-    });
-    const subscription = check.appSubscriptions[0];
-    if (subscription) {
-      await billing.cancel({
-        subscriptionId: subscription.id,
-        isTest,
-        prorate: true,
-      });
+    const shopContext = await loadShopBillingContext(admin, session.shop);
+    const access = await findPaidAccess(billing, shopContext, admin);
+    await clearAppPricingGrant(session.shop);
+    if (access?.billingSubscriptionId) {
+      const isTest = await shouldUseTestCharges(admin);
+      try {
+        await billing.cancel({
+          subscriptionId: access.billingSubscriptionId,
+          isTest,
+          prorate: true,
+        });
+      } catch {
+        // Already cancelled or test/live mismatch — still leave Settings.
+      }
     }
-    throw redirect("/app/billing?cancelled=1");
+    // Leave the iframe. A same-frame redirect unmounts s-modal while its
+    // nodes live on document.body and React throws removeChild.
+    throw await redirectToSubscribe(redirect, session.shop, shopContext);
   }
 
   if (formData.get("intent") === "connect-klaviyo") {
@@ -378,52 +377,52 @@ export default function Settings() {
             </s-paragraph>
           )}
           {subscription ? (
-            <>
-              <s-button
-                tone="critical"
-                commandFor="cancel-subscription-modal"
-                command="--show"
-              >
-                Cancel subscription
-              </s-button>
-              <s-modal
-                id="cancel-subscription-modal"
-                heading="Cancel Habit?"
-                accessibilityLabel="Cancel Habit subscription"
-              >
-                <s-paragraph>
-                  Billing stops immediately. Unused time in the current period is
-                  credited. You can start a new trial later from this app.
-                </s-paragraph>
-                <s-button
-                  slot="secondary-actions"
-                  variant="secondary"
-                  commandFor="cancel-subscription-modal"
-                  command="--hide"
-                >
-                  Keep subscription
-                </s-button>
-                <s-button
-                  slot="primary-action"
-                  variant="primary"
-                  tone="critical"
-                  loading={cancelling}
-                  onClick={() =>
-                    billingFetcher.submit(
-                      { intent: "cancel-subscription" },
-                      { method: "POST" },
-                    )
-                  }
-                >
-                  Cancel subscription
-                </s-button>
-              </s-modal>
-            </>
+            <s-button
+              tone="critical"
+              commandFor="cancel-subscription-modal"
+              command="--show"
+            >
+              Cancel subscription
+            </s-button>
           ) : (
             <s-button variant="primary" href="/app/billing">
               Start free trial
             </s-button>
           )}
+          <s-modal
+            id="cancel-subscription-modal"
+            heading="Cancel Habit?"
+            accessibilityLabel="Cancel Habit subscription"
+          >
+            <s-paragraph>
+              Billing stops immediately. Unused time in the current period is
+              credited. You can start a new trial later from this app.
+            </s-paragraph>
+            <s-button
+              slot="secondary-actions"
+              variant="secondary"
+              commandFor="cancel-subscription-modal"
+              command="--hide"
+            >
+              Keep subscription
+            </s-button>
+            <s-button
+              slot="primary-action"
+              variant="primary"
+              tone="critical"
+              loading={cancelling}
+              commandFor="cancel-subscription-modal"
+              command="--hide"
+              onClick={() =>
+                billingFetcher.submit(
+                  { intent: "cancel-subscription" },
+                  { method: "POST" },
+                )
+              }
+            >
+              Cancel subscription
+            </s-button>
+          </s-modal>
         </s-stack>
       </s-section>
 

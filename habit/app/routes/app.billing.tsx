@@ -3,48 +3,55 @@ import { useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import {
-  STANDARD_PLAN,
   STANDARD_PLAN_AMOUNT,
   STANDARD_PLAN_TRIAL_DAYS,
-  shouldUseTestCharges,
+  captureWelcomePlanHandle,
+  findPaidAccess,
+  loadShopBillingContext,
+  planSelectionUrl,
+  requestStandardSubscription,
+  useHostedPlanPage,
 } from "../lib/billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin, billing, redirect } = await authenticate.admin(request);
-  const isTest = await shouldUseTestCharges(admin);
-  const check = await billing.check({
-    plans: [STANDARD_PLAN],
-    isTest,
-  });
+  const { admin, billing, redirect, session } = await authenticate.admin(request);
+  await captureWelcomePlanHandle(request, session.shop);
+  const shopContext = await loadShopBillingContext(admin, session.shop);
+  const access = await findPaidAccess(billing, shopContext, admin);
 
   const url = new URL(request.url);
   const cancelled = url.searchParams.get("cancelled") === "1";
 
-  if (check.hasActivePayment && !cancelled) {
+  if (access && !cancelled) {
     throw redirect("/app");
+  }
+
+  if (useHostedPlanPage(shopContext.partnerDevelopment)) {
+    throw redirect(planSelectionUrl(session.shop), { target: "_top" });
   }
 
   return {
     cancelled,
     amount: STANDARD_PLAN_AMOUNT,
     trialDays: STANDARD_PLAN_TRIAL_DAYS,
+    // Draft plans can be tested on same-org dev stores. Do not auto-redirect:
+    // the hosted URL 404s until Enable, and that dumps merchants on Apps.
+    showHostedPlan: shopContext.partnerDevelopment || useHostedPlanPage(),
   };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin, billing } = await authenticate.admin(request);
-  const isTest = await shouldUseTestCharges(admin);
-
-  await billing.request({
-    plan: STANDARD_PLAN,
-    isTest,
-  });
-
-  return null;
+  const formData = await request.formData();
+  if (formData.get("intent") === "hosted-plans") {
+    const { redirect, session } = await authenticate.admin(request);
+    throw redirect(planSelectionUrl(session.shop), { target: "_top" });
+  }
+  await requestStandardSubscription(request);
 };
 
 export default function Billing() {
-  const { cancelled, amount, trialDays } = useLoaderData<typeof loader>();
+  const { cancelled, amount, trialDays, showHostedPlan } =
+    useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const submitting = fetcher.state !== "idle";
 
@@ -78,6 +85,19 @@ export default function Billing() {
             >
               Start {trialDays}-day free trial
             </s-button>
+            {showHostedPlan ? (
+              <s-button
+                loading={submitting}
+                onClick={() =>
+                  fetcher.submit(
+                    { intent: "hosted-plans" },
+                    { method: "POST" },
+                  )
+                }
+              >
+                Open Shopify plan page
+              </s-button>
+            ) : null}
           </s-stack>
           <s-paragraph color="subdued">
             {trialDays}-day free trial. You will not be charged until the trial

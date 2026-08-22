@@ -2,6 +2,7 @@
 
 client_id = "d4f4bcdc36a90b4443c2e6fde31bbd80"
 name = "Habit"
+handle = "habit"
 application_url = "https://habit-production-9257.up.railway.app/app"
 embedded = true
 
@@ -23,6 +24,10 @@ api_version = "2026-10"
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/uninstalled"
   topics = [ "app/uninstalled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/subscriptions_update"
+  topics = [ "app_subscriptions/update" ]
 
   [[webhooks.subscriptions]]
   uri = "/webhooks/orders/paid"
