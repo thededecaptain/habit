@@ -311,16 +311,19 @@ export default function Settings() {
   const klaviyoKeyRef = useRef("");
 
   const [form, setForm] = useState<FormState>(values);
-  // Bumped on discard to force the (uncontrolled) fields below to remount
-  // with their defaultValue reset to the last-saved values.
+  const [saved, setSaved] = useState<FormState>(values);
+  const [fieldDefaults, setFieldDefaults] = useState<FormState>(values);
+  const formRef = useRef(form);
+  formRef.current = form;
+  // Bumped on discard/save so uncontrolled fields remount with fieldDefaults.
   const [resetKey, setResetKey] = useState(0);
   // Tracks which fields the user has edited since the last save attempt, so
   // a stale validation error doesn't linger on a field after it's been fixed
   // (errors only actually clear once the next save response comes back).
   const [editedSinceSubmit, setEditedSinceSubmit] = useState<Set<string>>(new Set());
   const isDirty = useMemo(
-    () => JSON.stringify(form) !== JSON.stringify(values),
-    [form, values],
+    () => JSON.stringify(form) !== JSON.stringify(saved),
+    [form, saved],
   );
   const rawErrors = fetcher.data?.errors ?? {};
   const errors = Object.fromEntries(
@@ -344,9 +347,11 @@ export default function Settings() {
     if (fetcher.data && !fetcher.data.errors) {
       shopify.saveBar.hide(SAVE_BAR_ID);
       shopify.toast.show("Settings saved");
-      // Re-sync the uncontrolled fields to the canonical persisted values
-      // (e.g. in case the server reformats a number) once the loader
-      // revalidates with the freshly saved data.
+      // Loader revalidation lags the fetcher. Remount from what we just saved
+      // so the field does not flash the previous number until a full refresh.
+      const next = formRef.current;
+      setSaved(next);
+      setFieldDefaults(next);
       setResetKey((key) => key + 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -380,7 +385,8 @@ export default function Settings() {
   };
 
   const handleDiscard = () => {
-    setForm(values);
+    setForm(saved);
+    setFieldDefaults(saved);
     setEditedSinceSubmit(new Set());
     setResetKey((key) => key + 1);
   };
@@ -471,7 +477,7 @@ export default function Settings() {
             resetToken={resetKey}
             label="Points earned per $1 spent"
             name="pointsPerDollar"
-            defaultValue={values.pointsPerDollar}
+            defaultValue={fieldDefaults.pointsPerDollar}
             onInput={update("pointsPerDollar")}
             error={errors.pointsPerDollar}
             min={0}
@@ -518,7 +524,7 @@ export default function Settings() {
             resetToken={resetKey}
             label="Points needed for $1 off"
             name="redemptionRate"
-            defaultValue={values.redemptionRate}
+            defaultValue={fieldDefaults.redemptionRate}
             onInput={update("redemptionRate")}
             error={errors.redemptionRate}
             min={0}
@@ -527,7 +533,7 @@ export default function Settings() {
             resetToken={resetKey}
             label="Minimum points to redeem"
             name="minRedeemablePoints"
-            defaultValue={values.minRedeemablePoints}
+            defaultValue={fieldDefaults.minRedeemablePoints}
             onInput={update("minRedeemablePoints")}
             error={errors.minRedeemablePoints}
             min={0}
@@ -537,7 +543,7 @@ export default function Settings() {
             resetToken={resetKey}
             label="Max % of order payable with points"
             name="maxRedemptionPercent"
-            defaultValue={values.maxRedemptionPercent}
+            defaultValue={fieldDefaults.maxRedemptionPercent}
             onInput={update("maxRedemptionPercent")}
             error={errors.maxRedemptionPercent}
             min={0}
@@ -553,7 +559,7 @@ export default function Settings() {
             resetToken={resetKey}
             label="Bonus points for the referrer"
             name="referrerBonusPoints"
-            defaultValue={values.referrerBonusPoints}
+            defaultValue={fieldDefaults.referrerBonusPoints}
             onInput={update("referrerBonusPoints")}
             error={errors.referrerBonusPoints}
             min={0}
@@ -563,7 +569,7 @@ export default function Settings() {
             resetToken={resetKey}
             label="Bonus points for the new customer"
             name="refereeBonusPoints"
-            defaultValue={values.refereeBonusPoints}
+            defaultValue={fieldDefaults.refereeBonusPoints}
             onInput={update("refereeBonusPoints")}
             error={errors.refereeBonusPoints}
             min={0}
@@ -573,7 +579,7 @@ export default function Settings() {
             resetToken={resetKey}
             label="Referral code expiry (days)"
             name="referralCodeExpiryDays"
-            defaultValue={values.referralCodeExpiryDays}
+            defaultValue={fieldDefaults.referralCodeExpiryDays}
             onInput={update("referralCodeExpiryDays")}
             error={errors.referralCodeExpiryDays}
             min={1}
@@ -583,7 +589,7 @@ export default function Settings() {
             resetToken={resetKey}
             label="Max active referral codes per member"
             name="maxActiveReferralCodesPerCustomer"
-            defaultValue={values.maxActiveReferralCodesPerCustomer}
+            defaultValue={fieldDefaults.maxActiveReferralCodesPerCustomer}
             onInput={update("maxActiveReferralCodesPerCustomer")}
             error={errors.maxActiveReferralCodesPerCustomer}
             min={1}
@@ -594,7 +600,7 @@ export default function Settings() {
             resetToken={resetKey}
             label="Alert after this many codes shop-wide"
             name="referralVelocityThreshold"
-            defaultValue={values.referralVelocityThreshold}
+            defaultValue={fieldDefaults.referralVelocityThreshold}
             onInput={update("referralVelocityThreshold")}
             error={errors.referralVelocityThreshold}
             min={1}
@@ -605,7 +611,7 @@ export default function Settings() {
             resetToken={resetKey}
             label="Velocity window (minutes)"
             name="referralVelocityWindowMinutes"
-            defaultValue={values.referralVelocityWindowMinutes}
+            defaultValue={fieldDefaults.referralVelocityWindowMinutes}
             onInput={update("referralVelocityWindowMinutes")}
             error={errors.referralVelocityWindowMinutes}
             min={1}
@@ -621,7 +627,7 @@ export default function Settings() {
             resetToken={resetKey}
             label="Expire unused points after (days)"
             name="pointsExpiryDays"
-            defaultValue={values.pointsExpiryDays}
+            defaultValue={fieldDefaults.pointsExpiryDays}
             onInput={update("pointsExpiryDays")}
             error={errors.pointsExpiryDays}
             min={1}
@@ -691,7 +697,7 @@ export default function Settings() {
             key={`notificationWebhookUrl-${resetKey}`}
             label="Optional notification webhook URL"
             name="notificationWebhookUrl"
-            defaultValue={values.notificationWebhookUrl}
+            defaultValue={fieldDefaults.notificationWebhookUrl}
             onInput={update("notificationWebhookUrl")}
             error={errors.notificationWebhookUrl}
             details="Used only when Klaviyo is not connected. Habit POSTs JSON with eventName, customerEmail, and properties."
