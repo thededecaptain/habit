@@ -33,7 +33,7 @@ async function main() {
   await checkLanding();
   console.log("\nAutomated smoke checks passed.");
   console.log(
-    "Complete manual steps in docs/review-smoke-test.mdx before App Store submission.",
+    "Complete manual steps in listing/SMOKE_TEST.md before App Store submission.",
   );
 }
 

@@ -68,7 +68,7 @@ None identified from codebase review.
 
 ## Before you click Submit
 
-1. Run manual steps in [review-smoke-test.mdx](/review-smoke-test) (or `npm run smoke` after deploy).
+1. Run manual steps in `listing/SMOKE_TEST.md` (or `npm run smoke` after deploy).
 2. Paste listing copy from `listing/APP_STORE_LISTING.md` into Partner Dashboard.
 3. Update gethabitloyalty.com per `listing/MARKETING_SITE_CHECKLIST.md`.
 4. Set `SENTRY_DSN` on Railway.

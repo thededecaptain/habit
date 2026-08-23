@@ -29,7 +29,7 @@
       },
       {
         "group": "Account",
-        "pages": ["billing", "notifications", "support", "review-smoke-test"]
+        "pages": ["billing", "notifications", "support"]
       }
     ]
   },
