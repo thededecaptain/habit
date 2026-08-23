@@ -4,12 +4,12 @@ The marketing site is **not** in this repo. Update it manually before App Store 
 
 ## Must match the live app
 
-- [ ] **Price:** $49 USD / month (billed every 30 days) — not $29
-- [ ] **Trial:** 30-day free trial — not 14 days
+- [x] **Price:** $49 USD / month (billed every 30 days) — verified on gethabitloyalty.com Aug 2026
+- [x] **Trial:** 30-day free trial — verified on gethabitloyalty.com Aug 2026
 - [ ] **Billing:** Charged through Shopify App Pricing; cancel in app Settings
-- [ ] **Notifications:** Shopify Flow triggers + optional webhook — no “paste your Klaviyo API key in Habit”
-- [ ] **Support email:** support@gethabitloyalty.com
-- [ ] **Privacy / terms links:** https://gethabitloyalty.com/privacy and /terms
+- [ ] **Notifications:** Shopify Flow triggers + optional webhook — add Flow mention to marketing site if desired
+- [x] **Support email:** support@gethabitloyalty.com
+- [x] **Privacy / terms links:** https://gethabitloyalty.com/privacy and /terms
 
 ## Recommended copy snippets
 
