@@ -20,6 +20,10 @@ export function captureServerException(
   error: unknown,
   context?: Record<string, unknown>,
 ) {
+  // React Router and Shopify auth throw Response objects for HTTP outcomes — not errors.
+  if (error instanceof Response) {
+    return;
+  }
   if (!dsn) {
     console.error(error, context);
     return;
