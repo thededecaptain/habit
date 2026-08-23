@@ -32,6 +32,9 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      - name: Validate webhook URIs
+        run: npm run validate:webhooks
+
       - name: Lint app code
         run: npm run lint
 

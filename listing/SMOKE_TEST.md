@@ -9,7 +9,9 @@ cd habit
 npm run smoke
 ```
 
-This hits production `/health` and the public landing page. Set `HABIT_URL` to test another environment.
+This hits production `/health`, the public landing page, and confirms webhook routes return something other than 404 (Shopify sends real POSTs with HMAC — a bare POST should get 400, not 404). Set `HABIT_URL` to test another environment.
+
+CI also runs `npm run validate:webhooks` so webhook URIs in `shopify.app.toml` stay absolute (relative URIs resolve under `application_url`, which ends in `/app`, and Shopify would POST to `/app/webhooks/...` → 404).
 
 CI runs on every push to `main`: lint → build → Shopify Function tests.
 
@@ -69,5 +71,7 @@ See `listing/APP_STORE_LISTING.md` for full listing copy.
 ## Observability after deploy
 
 Set `SENTRY_DSN` on Railway to capture unhandled server errors. Check `/health` returns `{ "ok": true, "db": "ok" }`.
+
+**Partner Dashboard → Monitoring → Webhooks:** failure rate should stay below ~5%. Spikes on `app/uninstalled`, `shop/redact`, or `app_subscriptions/update` during review will block approval — check this **before** clicking Submit, not after.
 
 Query failed notification deliveries in Postgres: `NotificationOutbox` rows with `status = 'FAILED'`.
