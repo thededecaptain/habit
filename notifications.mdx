@@ -3,38 +3,277 @@ title: Notifications
 description: Send loyalty events through Shopify Flow or an optional HTTPS webhook.
 ---
 
-Habit can notify you when customers earn, redeem, refer, change tier, or have points about to expire. Configure this in **Settings → Notifications**.
+Habit can notify you when customers earn, redeem, refer, change tier, or have points about to expire. Configure the optional webhook in **Settings → Notifications**. Flow triggers are always available once Habit is installed.
+
+Events are delivered asynchronously. A slow or failing destination never blocks order processing or ledger writes.
+
+## How delivery works
+
+When something loyalty-related happens, Habit queues an event and a background job delivers it to:
+
+1. **Shopify Flow** — if the shop has an active Habit session and the payload is valid
+2. **Your webhook URL** — if one is saved in Settings
+
+Both can run for the same event. Flow is the primary merchant-facing path; the webhook is for custom endpoints, Zapier, or internal tooling.
+
+<Info>
+  Events are only queued when the member has an **email address** on file. Guests without email are skipped silently.
+</Info>
+
+---
 
 ## Shopify Flow
 
-Habit registers these triggers in Shopify Flow:
-
-- Points earned
-- Tier upgraded
-- Referral sent
-- Referral welcome bonus
-- Points redeemed
-- Points expiring soon
-- Points expired
+Habit registers seven triggers in Shopify Flow. Install the free [Shopify Flow](https://apps.shopify.com/flow) app if you do not already have it.
 
 <Steps>
   <Step title="Open Flow">
-    In Shopify admin, go to **Apps → Flow** (install Flow first if needed).
+    In Shopify admin, go to **Apps → Flow**.
   </Step>
   <Step title="Create a workflow">
-    Choose one of Habit's triggers, then add actions — for example send email through Klaviyo, Omnisend, or Shopify Email if those apps are connected to Flow.
+    Click **Create workflow**, choose a **Habit** trigger, then add actions — for example send email through Klaviyo, Omnisend, or Shopify Email when those apps are connected to Flow.
   </Step>
-  <Step title="Use customer data">
-    Each trigger includes the customer reference plus event-specific fields (points, tier name, referral code, etc.).
+  <Step title="Use customer and order data">
+    Every trigger includes a **customer** reference. Order-related triggers also include an **order** reference, so you can branch on `customer.email`, `order.name`, and other Flow variables.
   </Step>
 </Steps>
 
-Flow is the primary path. Merchants pick their own ESP or channel without Habit storing third-party API keys.
+### Available triggers
+
+| Trigger in Flow | When it fires |
+|---|---|
+| **Points earned** | A member earns points on a paid order |
+| **Tier upgraded** | A member reaches a new VIP tier |
+| **Referral sent** | A referrer earns a bonus because their code was used |
+| **Referral welcome bonus** | A new customer earns a welcome bonus from a referral |
+| **Points redeemed** | A member redeems points at checkout |
+| **Points expiring soon** | Unused points will expire within 7 days (requires expiry enabled in Settings) |
+| **Points expired** | Unused points were zeroed after the inactivity window |
+
+### Fields sent to Flow
+
+Each trigger sends a fixed set of fields. In Flow's editor, reference them as template variables (for example `{{ customer.email }}` or custom fields like `{{ Points }}`).
+
+#### Points earned
+
+| Field | Type | Description |
+|---|---|---|
+| Customer | reference | Shopify customer who earned points |
+| Customer email | email | Member email |
+| Order | reference | Order the points were earned on |
+| Points | number | Points earned on this order |
+| Points balance | number | Member balance after the earn |
+
+#### Tier upgraded
+
+| Field | Type | Description |
+|---|---|---|
+| Customer | reference | Member who reached the new tier |
+| Customer email | email | Member email |
+| Tier name | text | New VIP tier name |
+| Lifetime spend | number | Lifetime spend after this order |
+| Lifetime orders | number | Lifetime order count after this order |
+
+#### Referral sent / Referral welcome bonus
+
+| Field | Type | Description |
+|---|---|---|
+| Customer | reference | Referrer (sent) or new customer (welcome bonus) |
+| Customer email | email | Member email |
+| Bonus points | number | Points awarded for this referral |
+| Referral code | text | Code that was redeemed |
+
+#### Points redeemed
+
+| Field | Type | Description |
+|---|---|---|
+| Customer | reference | Member who redeemed |
+| Customer email | email | Member email |
+| Order | reference | Order where points were applied |
+| Points | number | Points redeemed |
+| Points balance | number | Member balance after redemption |
+
+#### Points expiring soon
+
+| Field | Type | Description |
+|---|---|---|
+| Customer | reference | Member whose points are expiring |
+| Customer email | email | Member email |
+| Points balance | number | Current balance |
+| Expires in days | number | Days until expiry (1–7) |
+| Expires on | text | ISO timestamp when points expire |
+
+#### Points expired
+
+| Field | Type | Description |
+|---|---|---|
+| Customer | reference | Member whose points expired |
+| Customer email | email | Member email |
+| Points expired | number | Points removed |
+
+<Note>
+  A workflow only runs after you create and turn it on in Flow. Installing Habit does not send emails by itself — you choose the trigger and actions.
+</Note>
+
+---
 
 ## Optional webhook
 
-You can also set **Optional notification webhook URL** in Settings. Habit POSTs JSON with `eventName`, `customerEmail`, and `properties`.
+Set **Optional notification webhook URL** in **Settings → Notifications**. Habit sends a `POST` request with `Content-Type: application/json`.
 
-The webhook runs **alongside** Flow — use it for a custom endpoint, Zapier, or internal tooling while Flow handles merchant-facing automations.
+The webhook runs **alongside** Flow, not instead of it.
 
-Events only send when the member has an email address on file.
+### Request format
+
+```http
+POST /your-endpoint HTTP/1.1
+Content-Type: application/json
+
+{
+  "eventName": "Habit: Points Earned",
+  "customerEmail": "member@example.com",
+  "properties": {
+    "points": 50,
+    "orderId": "5678901234",
+    "pointsBalance": 350
+  }
+}
+```
+
+| Top-level field | Type | Description |
+|---|---|---|
+| `eventName` | string | Which loyalty event fired (see table below) |
+| `customerEmail` | string | Member email |
+| `properties` | object | Event-specific payload (see below) |
+
+Habit expects a **2xx** response within **10 seconds**. Non-2xx responses are retried with exponential backoff (up to 8 attempts).
+
+<Warning>
+  Webhook URLs are not signed. Use a hard-to-guess HTTPS URL, or validate `customerEmail` and event data on your side before acting on a payload.
+</Warning>
+
+### `eventName` values
+
+| `eventName` | When it fires |
+|---|---|
+| `Habit: Points Earned` | Points credited on a paid order |
+| `Habit: Tier Upgraded` | VIP tier changed |
+| `Habit: Referral Sent` | Referrer bonus credited |
+| `Habit: Referral Welcome Bonus` | New customer welcome bonus credited |
+| `Habit: Points Redeemed` | Points applied at checkout |
+| `Habit: Points Expiring Soon` | Expiry warning (7-day window) |
+| `Habit: Points Expired` | Inactivity expiry processed |
+
+### `properties` by event
+
+#### `Habit: Points Earned`
+
+```json
+{
+  "points": 50,
+  "orderId": "5678901234",
+  "pointsBalance": 350
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `points` | number | Points earned |
+| `orderId` | string | Shopify order ID |
+| `pointsBalance` | number | Balance after earn |
+
+#### `Habit: Tier Upgraded`
+
+```json
+{
+  "tierName": "Gold",
+  "tierId": "uuid",
+  "lifetimeSpend": 1200.5,
+  "lifetimeOrders": 8,
+  "orderId": "5678901234"
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `tierName` | string | New tier name |
+| `tierId` | string | Habit tier ID |
+| `lifetimeSpend` | number | Lifetime spend after upgrade |
+| `lifetimeOrders` | number | Lifetime orders after upgrade |
+| `orderId` | string | Order that caused the upgrade (when applicable) |
+
+#### `Habit: Referral Sent` / `Habit: Referral Welcome Bonus`
+
+```json
+{
+  "bonusPoints": 500,
+  "code": "ABC12345"
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `bonusPoints` | number | Points awarded |
+| `code` | string | Referral code redeemed |
+
+#### `Habit: Points Redeemed`
+
+```json
+{
+  "points": 200,
+  "orderId": "5678901234",
+  "pointsBalance": 150
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `points` | number | Points redeemed |
+| `orderId` | string | Shopify order ID |
+| `pointsBalance` | number | Balance after redemption |
+
+#### `Habit: Points Expiring Soon`
+
+```json
+{
+  "pointsBalance": 400,
+  "expiresInDays": 3,
+  "expiresOn": "2026-08-26T12:00:00.000Z"
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `pointsBalance` | number | Current balance |
+| `expiresInDays` | number | Days until expiry |
+| `expiresOn` | string | ISO 8601 expiry timestamp |
+
+#### `Habit: Points Expired`
+
+```json
+{
+  "pointsExpired": 400
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `pointsExpired` | number | Points removed |
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="I created a Flow workflow but nothing happens">
+    Confirm the workflow is **On**, the trigger matches the action you expect (for example **Points earned** after a test order), and the customer on that order has an email. Flow only receives events Habit successfully emits — check that Habit is installed and the shop is on an active trial or paid plan.
+  </Accordion>
+  <Accordion title="My webhook never receives events">
+    Confirm the URL is HTTPS, returns 2xx within 10 seconds, and is saved in **Settings → Notifications**. Leave the field blank to disable the webhook. Flow and the webhook are independent — turning off the webhook does not affect Flow.
+  </Accordion>
+  <Accordion title="Can I use Klaviyo?">
+    Yes — connect Klaviyo to Shopify Flow and add a Klaviyo action to a Habit trigger workflow. You do not need to install the Klaviyo Shopify app or paste API keys into Habit.
+  </Accordion>
+</AccordionGroup>
+
+Need help wiring a specific workflow? Email [support@gethabitloyalty.com](mailto:support@gethabitloyalty.com).
