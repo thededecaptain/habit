@@ -1,0 +1,24 @@
+api_version = "2026-01"
+
+[[extensions]]
+name = "Referral welcome bonus"
+type = "flow_trigger"
+handle = "referral-welcome-bonus"
+description = "A new customer earned a welcome bonus from a referral."
+uid = "a1b2c3d4-e5f6-7890-abcd-ef0100010004"
+
+[settings]
+  [[settings.fields]]
+  type = "customer_reference"
+
+  [[settings.fields]]
+  type = "email"
+  key = "Customer email"
+
+  [[settings.fields]]
+  type = "number_decimal"
+  key = "Bonus points"
+
+  [[settings.fields]]
+  type = "single_line_text_field"
+  key = "Referral code"

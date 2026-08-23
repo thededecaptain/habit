@@ -1,0 +1,20 @@
+api_version = "2026-01"
+
+[[extensions]]
+name = "Points expired"
+type = "flow_trigger"
+handle = "points-expired"
+description = "A member's unused points expired due to inactivity."
+uid = "a1b2c3d4-e5f6-7890-abcd-ef0100010007"
+
+[settings]
+  [[settings.fields]]
+  type = "customer_reference"
+
+  [[settings.fields]]
+  type = "email"
+  key = "Customer email"
+
+  [[settings.fields]]
+  type = "number_decimal"
+  key = "Points expired"

@@ -70,12 +70,7 @@ model ShopSettings {
   referralVelocityAlertAt       DateTime?
   referralVelocityDismissedAt   DateTime?
 
-  // Encrypted Klaviyo private API key (AES-256-GCM via HABIT_ENCRYPTION_KEY).
-  // Never returned in loaders. Rotating HABIT_ENCRYPTION_KEY makes stored keys
-  // undecryptable — merchants must reconnect Klaviyo.
-  klaviyoApiKeyEncrypted String?
-  klaviyoEnabled         Boolean @default(false)
-  // Optional HTTPS fallback when Klaviyo is not connected.
+  // Optional HTTPS webhook for loyalty events (runs alongside Shopify Flow).
   notificationWebhookUrl String?
 
   // Null = points never expire. Clock is purchase-only (EARN / REDEEM).
@@ -219,11 +214,13 @@ enum NotificationOutboxStatus {
 }
 
 model NotificationOutbox {
-  id            String                    @id @default(uuid())
-  shop          String
-  eventName     String
-  customerEmail String
-  properties    Json
+  id                String                    @id @default(uuid())
+  shop              String
+  eventName         String
+  customerEmail     String
+  shopifyCustomerId String?
+  orderId           String?
+  properties        Json
   uniqueKey     String
   status        NotificationOutboxStatus  @default(PENDING)
   attempts      Int                       @default(0)

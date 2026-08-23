@@ -59,6 +59,7 @@ export async function enqueueExpiringSoonEvents() {
         shop: shop.shop,
         eventName: EVENT_POINTS_EXPIRING_SOON,
         customerEmail: member.email,
+        shopifyCustomerId: member.shopifyCustomerId,
         uniqueKey: `${EVENT_POINTS_EXPIRING_SOON}:${member.id}:${expiryDateISO}`,
         properties: {
           pointsBalance: member.pointsBalance,

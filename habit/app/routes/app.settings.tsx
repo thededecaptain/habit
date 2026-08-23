@@ -17,18 +17,15 @@ import {
   shouldUseTestCharges,
 } from "../lib/billing.server";
 import { PRIVACY_URL, SUPPORT_EMAIL, SUPPORT_MAILTO, TERMS_URL } from "../lib/brand";
-import { EncryptionConfigError, encryptSecret } from "../lib/secrets.server";
 
-// Keep these names in the route so the settings UI can list them without
-// importing a .server module (React Router would otherwise fail the client bundle).
-const KLAVIYO_METRIC_NAMES = [
-  "Habit: Points Earned",
-  "Habit: Tier Upgraded",
-  "Habit: Referral Sent",
-  "Habit: Referral Welcome Bonus",
-  "Habit: Points Redeemed",
-  "Habit: Points Expiring Soon",
-  "Habit: Points Expired",
+const LOYALTY_EVENT_NAMES = [
+  "Points earned",
+  "Tier upgraded",
+  "Referral sent",
+  "Referral welcome bonus",
+  "Points redeemed",
+  "Points expiring soon",
+  "Points expired",
 ] as const;
 
 const SAVE_BAR_ID = "settings-save-bar";
@@ -110,7 +107,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   return {
     values,
-    klaviyoConnected: Boolean(settings.klaviyoEnabled && settings.klaviyoApiKeyEncrypted),
     amount: STANDARD_PLAN_AMOUNT,
     trialDays: STANDARD_PLAN_TRIAL_DAYS,
     subscription: access
@@ -202,39 +198,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Leave the iframe. A same-frame redirect unmounts s-modal while its
     // nodes live on document.body and React throws removeChild.
     throw await redirectToSubscribe(redirect, session.shop, shopContext);
-  }
-
-  if (formData.get("intent") === "connect-klaviyo") {
-    const key = String(formData.get("klaviyoApiKey") ?? "").trim();
-    if (!key) {
-      return { errors: { klaviyoApiKey: "Enter a Klaviyo private API key." } };
-    }
-    try {
-      const encrypted = encryptSecret(key);
-      await db.shopSettings.update({
-        where: { shop: session.shop },
-        data: { klaviyoApiKeyEncrypted: encrypted, klaviyoEnabled: true },
-      });
-    } catch (error) {
-      if (error instanceof EncryptionConfigError) {
-        return {
-          errors: {
-            klaviyoApiKey:
-              "Habit isn't configured to store API keys yet. Contact support.",
-          },
-        };
-      }
-      throw error;
-    }
-    return { errors: null, klaviyoSaved: true, klaviyoConnected: true };
-  }
-
-  if (formData.get("intent") === "disconnect-klaviyo") {
-    await db.shopSettings.update({
-      where: { shop: session.shop },
-      data: { klaviyoApiKeyEncrypted: null, klaviyoEnabled: false },
-    });
-    return { errors: null, klaviyoSaved: true, klaviyoConnected: false };
   }
 
   const fields = {
@@ -339,12 +302,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Settings() {
-  const { values, klaviyoConnected, amount, trialDays, subscription } = useLoaderData<typeof loader>();
+  const { values, amount, trialDays, subscription } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const billingFetcher = useFetcher();
-  const notifyFetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
-  const klaviyoKeyRef = useRef("");
 
   const [form, setForm] = useState<FormState>(values);
   const [saved, setSaved] = useState<FormState>(values);
@@ -365,11 +326,6 @@ export default function Settings() {
   const errors = Object.fromEntries(
     Object.entries(rawErrors).filter(([key]) => !editedSinceSubmit.has(key)),
   ) as typeof rawErrors;
-  const klaviyoError =
-    notifyFetcher.data && notifyFetcher.data.errors
-      ? notifyFetcher.data.errors.klaviyoApiKey
-      : undefined;
-  const notifyBusy = notifyFetcher.state !== "idle";
 
   useEffect(() => {
     if (isDirty) {
@@ -392,16 +348,6 @@ export default function Settings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetcher.data]);
 
-  useEffect(() => {
-    if (notifyFetcher.data && !notifyFetcher.data.errors) {
-      shopify.toast.show(
-        notifyFetcher.data.klaviyoConnected ? "Klaviyo connected" : "Klaviyo disconnected",
-      );
-      klaviyoKeyRef.current = "";
-      setResetKey((key) => key + 1);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notifyFetcher.data]);
   // These fields are intentionally uncontrolled (defaultValue, not value):
   // Polaris's number/text field custom elements don't reliably accept
   // programmatic `value` updates from React re-renders, so feeding the typed
@@ -676,60 +622,16 @@ export default function Settings() {
 
       <s-section heading="Notifications">
         <s-stack direction="block" gap="base">
-          <s-stack direction="inline" gap="small-200" alignItems="center">
-            <s-text type="strong">Klaviyo</s-text>
-            {klaviyoConnected ? (
-              <s-badge tone="success">Connected</s-badge>
-            ) : (
-              <s-badge tone="warning">Not connected</s-badge>
-            )}
-          </s-stack>
           <s-paragraph color="subdued">
-            Build flows in Klaviyo from these metrics. The private API key needs events:write.
-            If the server encryption key is rotated, reconnect Klaviyo here — stored keys cannot
-            be decrypted with a new key. Webhook URLs are unaffected.
+            Habit emits loyalty events to Shopify Flow automatically. In Flow, create workflows
+            from these triggers — then route to Klaviyo, email, Slack, or any other app that
+            connects to Flow.
           </s-paragraph>
           <s-unordered-list>
-            {KLAVIYO_METRIC_NAMES.map((name) => (
+            {LOYALTY_EVENT_NAMES.map((name) => (
               <s-list-item key={name}>{name}</s-list-item>
             ))}
           </s-unordered-list>
-          <s-password-field
-            key={`klaviyoApiKey-${resetKey}`}
-            label="Klaviyo private API key"
-            name="klaviyoApiKey"
-            autocomplete="off"
-            error={klaviyoError}
-            details="Leave empty except to set or replace the key. The key is never shown again."
-            onInput={(event: { currentTarget?: { value?: string } }) => {
-              klaviyoKeyRef.current = event.currentTarget?.value ?? "";
-            }}
-          />
-          <s-stack direction="inline" gap="small-200">
-            <s-button
-              variant="primary"
-              loading={notifyBusy}
-              onClick={() =>
-                notifyFetcher.submit(
-                  { intent: "connect-klaviyo", klaviyoApiKey: klaviyoKeyRef.current },
-                  { method: "POST" },
-                )
-              }
-            >
-              {klaviyoConnected ? "Replace key" : "Connect Klaviyo"}
-            </s-button>
-            {klaviyoConnected ? (
-              <s-button
-                tone="critical"
-                loading={notifyBusy}
-                onClick={() =>
-                  notifyFetcher.submit({ intent: "disconnect-klaviyo" }, { method: "POST" })
-                }
-              >
-                Disconnect
-              </s-button>
-            ) : null}
-          </s-stack>
           <s-url-field
             key={`notificationWebhookUrl-${resetKey}`}
             label="Optional notification webhook URL"
@@ -737,7 +639,7 @@ export default function Settings() {
             defaultValue={fieldDefaults.notificationWebhookUrl}
             onInput={update("notificationWebhookUrl")}
             error={errors.notificationWebhookUrl}
-            details="Used only when Klaviyo is not connected. Habit POSTs JSON with eventName, customerEmail, and properties."
+            details="Habit POSTs JSON with eventName, customerEmail, and properties. Runs alongside Flow, not instead of it."
           />
         </s-stack>
       </s-section>

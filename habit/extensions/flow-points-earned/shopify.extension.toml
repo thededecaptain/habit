@@ -1,0 +1,27 @@
+api_version = "2026-01"
+
+[[extensions]]
+name = "Points earned"
+type = "flow_trigger"
+handle = "points-earned"
+description = "A member earned loyalty points on an order."
+uid = "a1b2c3d4-e5f6-7890-abcd-ef0100010001"
+
+[settings]
+  [[settings.fields]]
+  type = "customer_reference"
+
+  [[settings.fields]]
+  type = "email"
+  key = "Customer email"
+
+  [[settings.fields]]
+  type = "order_reference"
+
+  [[settings.fields]]
+  type = "number_decimal"
+  key = "Points"
+
+  [[settings.fields]]
+  type = "number_decimal"
+  key = "Points balance"

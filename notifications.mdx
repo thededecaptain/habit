@@ -1,38 +1,40 @@
 ---
 title: Notifications
-description: Send loyalty events to Klaviyo, or to an HTTPS webhook if Klaviyo is not connected.
+description: Send loyalty events through Shopify Flow or an optional HTTPS webhook.
 ---
 
 Habit can notify you when customers earn, redeem, refer, change tier, or have points about to expire. Configure this in **Settings → Notifications**.
 
-## Klaviyo
+## Shopify Flow
+
+Habit registers these triggers in Shopify Flow:
+
+- Points earned
+- Tier upgraded
+- Referral sent
+- Referral welcome bonus
+- Points redeemed
+- Points expiring soon
+- Points expired
 
 <Steps>
-  <Step title="Create a private API key">
-    In Klaviyo, create a private API key with **events:write**.
+  <Step title="Open Flow">
+    In Shopify admin, go to **Apps → Flow** (install Flow first if needed).
   </Step>
-  <Step title="Connect Habit">
-    Paste the key into **Klaviyo private API key** and click **Connect Klaviyo**. The key is stored encrypted and is never shown again.
+  <Step title="Create a workflow">
+    Choose one of Habit's triggers, then add actions — for example send email through Klaviyo, Omnisend, or Shopify Email if those apps are connected to Flow.
   </Step>
-  <Step title="Build flows">
-    Use these metrics in Klaviyo:
+  <Step title="Use customer data">
+    Each trigger includes the customer reference plus event-specific fields (points, tier name, referral code, etc.).
   </Step>
 </Steps>
 
-- Habit: Points Earned
-- Habit: Tier Upgraded
-- Habit: Referral Sent
-- Habit: Referral Welcome Bonus
-- Habit: Points Redeemed
-- Habit: Points Expiring Soon
-- Habit: Points Expired
-
-Events only send when the customer has an email address. If the server encryption key is rotated, reconnect Klaviyo — stored keys cannot be decrypted with a new key. Webhook URLs are unaffected.
-
-Click **Disconnect** to stop sending to Klaviyo.
+Flow is the primary path. Merchants pick their own ESP or channel without Habit storing third-party API keys.
 
 ## Optional webhook
 
-If Klaviyo is not connected, Habit POSTs JSON to **Optional notification webhook URL**. The body includes `eventName`, `customerEmail`, and `properties`.
+You can also set **Optional notification webhook URL** in Settings. Habit POSTs JSON with `eventName`, `customerEmail`, and `properties`.
 
-The webhook is a fallback. It is not used while Klaviyo is connected.
+The webhook runs **alongside** Flow — use it for a custom endpoint, Zapier, or internal tooling while Flow handles merchant-facing automations.
+
+Events only send when the member has an email address on file.

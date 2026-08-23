@@ -136,6 +136,8 @@ export async function awardPointsForOrder(params: {
           shop,
           eventName: EVENT_TIER_UPGRADED,
           customerEmail: email,
+          shopifyCustomerId: customer.shopifyCustomerId,
+          orderId,
           uniqueKey: `${EVENT_TIER_UPGRADED}:${customer.id}:${orderId}`,
           properties: {
             tierName: nextTier.name,
@@ -180,6 +182,8 @@ export async function awardPointsForOrder(params: {
       shop,
       eventName: EVENT_POINTS_EARNED,
       customerEmail: email,
+      shopifyCustomerId: customer.shopifyCustomerId,
+      orderId,
       uniqueKey: `${EVENT_POINTS_EARNED}:${transaction.id}`,
       properties: { points, orderId, pointsBalance: newBalance },
     });
@@ -188,6 +192,8 @@ export async function awardPointsForOrder(params: {
         shop,
         eventName: EVENT_TIER_UPGRADED,
         customerEmail: email,
+        shopifyCustomerId: customer.shopifyCustomerId,
+        orderId,
         uniqueKey: `${EVENT_TIER_UPGRADED}:${transaction.id}`,
         properties: {
           tierName: nextTier.name,
@@ -338,6 +344,8 @@ export async function finalizeRedemptionForOrder(params: {
       shop,
       eventName: EVENT_POINTS_REDEEMED,
       customerEmail: customer.email,
+      shopifyCustomerId: customer.shopifyCustomerId,
+      orderId,
       uniqueKey: `${EVENT_POINTS_REDEEMED}:${transaction.id}`,
       properties: { points: pointsToDeduct, orderId, pointsBalance: newBalance },
     });
@@ -482,6 +490,8 @@ export async function redeemReferralCode(params: {
       shop,
       eventName: EVENT_REFERRAL_SENT,
       customerEmail: owner.email,
+      shopifyCustomerId: owner.shopifyCustomerId,
+      orderId,
       uniqueKey: `${EVENT_REFERRAL_SENT}:${referrerTx.id}`,
       properties: { bonusPoints: settings.referrerBonusPoints, code: referralCode.code },
     });
@@ -489,6 +499,8 @@ export async function redeemReferralCode(params: {
       shop,
       eventName: EVENT_REFERRAL_WELCOME,
       customerEmail: referee.email,
+      shopifyCustomerId: referee.shopifyCustomerId,
+      orderId,
       uniqueKey: `${EVENT_REFERRAL_WELCOME}:${refereeTx.id}`,
       properties: { bonusPoints: settings.refereeBonusPoints, code: referralCode.code },
     });
@@ -548,6 +560,7 @@ export async function expireInactiveBalances() {
           shop: shop.shop,
           eventName: EVENT_POINTS_EXPIRED,
           customerEmail: fresh.email,
+          shopifyCustomerId: fresh.shopifyCustomerId,
           uniqueKey: `${EVENT_POINTS_EXPIRED}:${expireTx.id}`,
           properties: { pointsExpired },
         });

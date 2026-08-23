@@ -1,7 +1,12 @@
 import type { Prisma } from "@prisma/client";
 import { Prisma as PrismaNS } from "@prisma/client";
 import prisma from "../db.server";
-import { decryptSecret } from "./secrets.server";
+import { unauthenticated } from "../shopify.server";
+import {
+  buildFlowPayload,
+  emitFlowTrigger,
+  FLOW_TRIGGER_HANDLES,
+} from "./flow.server";
 
 export const EVENT_POINTS_EARNED = "Habit: Points Earned";
 export const EVENT_TIER_UPGRADED = "Habit: Tier Upgraded";
@@ -11,7 +16,7 @@ export const EVENT_POINTS_REDEEMED = "Habit: Points Redeemed";
 export const EVENT_POINTS_EXPIRING_SOON = "Habit: Points Expiring Soon";
 export const EVENT_POINTS_EXPIRED = "Habit: Points Expired";
 
-export const KLAVIYO_METRIC_NAMES = [
+export const LOYALTY_EVENT_NAMES = [
   EVENT_POINTS_EARNED,
   EVENT_TIER_UPGRADED,
   EVENT_REFERRAL_SENT,
@@ -21,8 +26,6 @@ export const KLAVIYO_METRIC_NAMES = [
   EVENT_POINTS_EXPIRED,
 ] as const;
 
-const KLAVIYO_EVENTS_URL = "https://a.klaviyo.com/api/events/";
-const KLAVIYO_REVISION = "2024-10-15";
 const MAX_ATTEMPTS = 8;
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
@@ -33,6 +36,8 @@ export async function enqueueLoyaltyEvent(
     shop: string;
     eventName: string;
     customerEmail: string | null | undefined;
+    shopifyCustomerId?: string | null;
+    orderId?: string | null;
     uniqueKey: string;
     properties: Record<string, unknown>;
   },
@@ -46,6 +51,8 @@ export async function enqueueLoyaltyEvent(
         shop: params.shop,
         eventName: params.eventName,
         customerEmail: email,
+        shopifyCustomerId: params.shopifyCustomerId ?? null,
+        orderId: params.orderId ?? null,
         uniqueKey: params.uniqueKey,
         properties: params.properties as Prisma.InputJsonValue,
       },
@@ -55,50 +62,6 @@ export async function enqueueLoyaltyEvent(
       return;
     }
     throw error;
-  }
-}
-
-export async function trackKlaviyoEvent(params: {
-  apiKey: string;
-  eventName: string;
-  customerEmail: string;
-  properties: Record<string, unknown>;
-  uniqueId: string;
-}) {
-  const response = await fetch(KLAVIYO_EVENTS_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Klaviyo-API-Key ${params.apiKey}`,
-      revision: KLAVIYO_REVISION,
-      accept: "application/json",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      data: {
-        type: "event",
-        attributes: {
-          metric: {
-            data: {
-              type: "metric",
-              attributes: { name: params.eventName },
-            },
-          },
-          profile: {
-            data: {
-              type: "profile",
-              attributes: { email: params.customerEmail },
-            },
-          },
-          properties: params.properties,
-          unique_id: params.uniqueId,
-        },
-      },
-    }),
-    signal: AbortSignal.timeout(10_000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Klaviyo responded ${response.status}`);
   }
 }
 
@@ -126,52 +89,90 @@ function asProperties(value: Prisma.JsonValue): Record<string, unknown> {
   return {};
 }
 
+async function resolveShopifyCustomerId(
+  shop: string,
+  email: string,
+  stored: string | null,
+): Promise<string | null> {
+  if (stored) return stored;
+  const customer = await prisma.customer.findFirst({
+    where: { shop, email },
+    select: { shopifyCustomerId: true },
+  });
+  return customer?.shopifyCustomerId ?? null;
+}
+
 async function deliverOutboxRow(row: {
   shop: string;
   eventName: string;
   customerEmail: string;
+  shopifyCustomerId: string | null;
+  orderId: string | null;
   properties: Prisma.JsonValue;
-  uniqueKey: string;
 }) {
   const settings = await prisma.shopSettings.findUnique({ where: { shop: row.shop } });
   const properties = asProperties(row.properties);
+  const shopifyCustomerId = await resolveShopifyCustomerId(
+    row.shop,
+    row.customerEmail,
+    row.shopifyCustomerId,
+  );
 
-  if (settings?.klaviyoEnabled && settings.klaviyoApiKeyEncrypted) {
-    let apiKey: string;
-    try {
-      apiKey = decryptSecret(settings.klaviyoApiKeyEncrypted);
-    } catch {
-      throw new DecryptFailedError();
-    }
-    await trackKlaviyoEvent({
-      apiKey,
+  let delivered = false;
+  const errors: string[] = [];
+
+  const handle = FLOW_TRIGGER_HANDLES[row.eventName];
+  if (handle) {
+    const payload = buildFlowPayload({
       eventName: row.eventName,
       customerEmail: row.customerEmail,
+      shopifyCustomerId,
+      orderId: row.orderId,
       properties,
-      uniqueId: row.uniqueKey,
     });
-    return;
+    if (payload) {
+      try {
+        const { admin } = await unauthenticated.admin(row.shop);
+        await emitFlowTrigger(admin, handle, payload);
+        delivered = true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Flow trigger failed";
+        errors.push(`Flow: ${message}`);
+      }
+    } else {
+      errors.push("Flow: missing customer or order id for trigger payload");
+    }
   }
 
   if (settings?.notificationWebhookUrl) {
-    await postMerchantWebhook(
-      settings.notificationWebhookUrl,
-      row.eventName,
-      row.customerEmail,
-      properties,
-    );
-    return;
+    try {
+      await postMerchantWebhook(
+        settings.notificationWebhookUrl,
+        row.eventName,
+        row.customerEmail,
+        properties,
+      );
+      delivered = true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Webhook failed";
+      errors.push(`Webhook: ${message}`);
+    }
   }
 
-  console.log(`Skipping notification ${row.eventName} for ${row.shop}: no destination configured`);
-  return "skipped" as const;
-}
-
-class DecryptFailedError extends Error {
-  constructor() {
-    super("Could not decrypt Klaviyo key. Reconnect Klaviyo in Settings.");
-    this.name = "DecryptFailedError";
+  if (!delivered && errors.length === 0) {
+    console.log(`Skipping notification ${row.eventName} for ${row.shop}: no destination configured`);
+    return "skipped" as const;
   }
+
+  if (!delivered) {
+    throw new Error(errors.join("; "));
+  }
+
+  if (errors.length > 0) {
+    console.warn(`Partial notification delivery for ${row.eventName} (${row.shop}): ${errors.join("; ")}`);
+  }
+
+  return "sent" as const;
 }
 
 const OUTBOX_BATCH = 50;
@@ -215,14 +216,9 @@ export async function processOutbox() {
         sent += 1;
       }
     } catch (error) {
-      const message =
-        error instanceof DecryptFailedError
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : "Send failed";
+      const message = error instanceof Error ? error.message : "Send failed";
 
-      if (error instanceof DecryptFailedError || attempts >= MAX_ATTEMPTS) {
+      if (attempts >= MAX_ATTEMPTS) {
         await prisma.notificationOutbox.update({
           where: { id: row.id },
           data: { status: "FAILED", lastError: message, processedAt: new Date() },
