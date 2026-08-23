@@ -125,18 +125,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 };
 
-function parsePositiveNumber(value: FormDataEntryValue | null, label: string) {
+const POINTS_PER_DOLLAR_MAX = 9999.99;
+const REDEMPTION_RATE_MAX = 999999.99;
+const INT_SETTING_MAX = 2_147_483_647;
+
+function parsePositiveNumber(
+  value: FormDataEntryValue | null,
+  label: string,
+  max?: number,
+) {
   const num = Number(value);
   if (!value || Number.isNaN(num) || num <= 0) {
     return { error: `${label} must be a number greater than 0.` };
   }
+  if (max != null && num > max) {
+    return { error: `${label} must be ${max} or less.` };
+  }
   return { value: num };
 }
 
-function parsePositiveInt(value: FormDataEntryValue | null, label: string) {
+function parsePositiveInt(
+  value: FormDataEntryValue | null,
+  label: string,
+  max = INT_SETTING_MAX,
+) {
   const num = Number(value);
   if (!value || !Number.isInteger(num) || num <= 0) {
     return { error: `${label} must be a whole number greater than 0.` };
+  }
+  if (num > max) {
+    return { error: `${label} must be ${max.toLocaleString()} or less.` };
   }
   return { value: num };
 }
@@ -220,8 +238,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const fields = {
-    pointsPerDollar: parsePositiveNumber(formData.get("pointsPerDollar"), "Points per dollar"),
-    redemptionRate: parsePositiveNumber(formData.get("redemptionRate"), "Redemption rate"),
+    pointsPerDollar: parsePositiveNumber(
+      formData.get("pointsPerDollar"),
+      "Points per dollar",
+      POINTS_PER_DOLLAR_MAX,
+    ),
+    redemptionRate: parsePositiveNumber(
+      formData.get("redemptionRate"),
+      "Redemption rate",
+      REDEMPTION_RATE_MAX,
+    ),
     minRedeemablePoints: parsePositiveInt(
       formData.get("minRedeemablePoints"),
       "Minimum redeemable points",
@@ -278,23 +304,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { errors: { maxRedemptionPercent: "Max redemption percent can't exceed 100." } };
   }
 
-  const updated = await db.shopSettings.update({
-    where: { shop: session.shop },
-    data: {
-      pointsPerDollar: fields.pointsPerDollar.value,
-      redemptionRate: fields.redemptionRate.value,
-      minRedeemablePoints: fields.minRedeemablePoints.value,
-      maxRedemptionPercent: fields.maxRedemptionPercent.value,
-      referrerBonusPoints: fields.referrerBonusPoints.value,
-      refereeBonusPoints: fields.refereeBonusPoints.value,
-      referralCodeExpiryDays: fields.referralCodeExpiryDays.value,
-      maxActiveReferralCodesPerCustomer: fields.maxActiveReferralCodesPerCustomer.value,
-      referralVelocityThreshold: fields.referralVelocityThreshold.value,
-      referralVelocityWindowMinutes: fields.referralVelocityWindowMinutes.value,
-      pointsExpiryDays: fields.pointsExpiryDays.value,
-      notificationWebhookUrl: fields.notificationWebhookUrl.value,
-    },
-  });
+  let updated;
+  try {
+    updated = await db.shopSettings.update({
+      where: { shop: session.shop },
+      data: {
+        pointsPerDollar: fields.pointsPerDollar.value,
+        redemptionRate: fields.redemptionRate.value,
+        minRedeemablePoints: fields.minRedeemablePoints.value,
+        maxRedemptionPercent: fields.maxRedemptionPercent.value,
+        referrerBonusPoints: fields.referrerBonusPoints.value,
+        refereeBonusPoints: fields.refereeBonusPoints.value,
+        referralCodeExpiryDays: fields.referralCodeExpiryDays.value,
+        maxActiveReferralCodesPerCustomer: fields.maxActiveReferralCodesPerCustomer.value,
+        referralVelocityThreshold: fields.referralVelocityThreshold.value,
+        referralVelocityWindowMinutes: fields.referralVelocityWindowMinutes.value,
+        pointsExpiryDays: fields.pointsExpiryDays.value,
+        notificationWebhookUrl: fields.notificationWebhookUrl.value,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to save settings", error);
+    return {
+      errors: {
+        pointsPerDollar: "That number is too large to save. Use a smaller value.",
+      },
+    };
+  }
 
   await syncLoyaltySettingsMetafield(admin, session.shop, updated);
   await ensureRedemptionDiscount(admin, session.shop);
@@ -347,12 +383,11 @@ export default function Settings() {
     if (fetcher.data && !fetcher.data.errors) {
       shopify.saveBar.hide(SAVE_BAR_ID);
       shopify.toast.show("Settings saved");
-      // Loader revalidation lags the fetcher. Remount from what we just saved
-      // so the field does not flash the previous number until a full refresh.
+      // Keep the typed values on screen. Remounting Polaris number fields
+      // after save can throw removeChild and blank the embedded page.
       const next = formRef.current;
       setSaved(next);
       setFieldDefaults(next);
-      setResetKey((key) => key + 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetcher.data]);
@@ -481,6 +516,7 @@ export default function Settings() {
             onInput={update("pointsPerDollar")}
             error={errors.pointsPerDollar}
             min={0}
+            max={POINTS_PER_DOLLAR_MAX}
             step={0.01}
             details="Applied to the order subtotal, before VIP tier multipliers."
           />
@@ -528,6 +564,7 @@ export default function Settings() {
             onInput={update("redemptionRate")}
             error={errors.redemptionRate}
             min={0}
+            max={REDEMPTION_RATE_MAX}
           />
           <StableNumberField
             resetToken={resetKey}
