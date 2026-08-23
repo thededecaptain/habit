@@ -6,18 +6,12 @@ Generated from Shopify's [AI self-review requirements](https://shopify.dev/docs/
 
 ## Summary
 
-✅ **Likely passing:** 38  
+✅ **Likely passing:** 37  
 ❌ **Likely failing:** 0  
-⚠️ **Needs review:** 4  
+⚠️ **Needs review:** 3  
 ⏭️ **Groups skipped:** 8 _(see below)_
 
 ## ⚠️ Requirements that need review
-
-⚠️ **2.3.1 Initiate installation from a Shopify-owned surface**
-
-**Why this needs attention:** The public landing page at `/_index` includes a shop-domain login form for direct access outside Shopify admin. App Store installs normally go through OAuth from Shopify; this form is for returning merchants or dev use.
-
-**What was detected:** `habit/app/routes/_index/route.tsx` renders a `your-store.myshopify.com` input when not embedded. Embedded installs (the review path) redirect to `/app` immediately.
 
 ⚠️ **5.1.3 Include detailed onboarding instructions for theme app extensions**
 

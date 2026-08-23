@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
-import { redirect, Form, useLoaderData } from "react-router";
+import { redirect, useLoaderData } from "react-router";
 
-import { login } from "../../shopify.server";
+import { APP_STORE_INSTALL_URL } from "../../lib/brand";
 
 import styles from "./styles.module.css";
 
@@ -30,11 +30,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw redirect(`/app?${params.toString()}`);
   }
 
-  return { showForm: Boolean(login) };
+  return { installUrl: APP_STORE_INSTALL_URL };
 };
 
 export default function App() {
-  const { showForm } = useLoaderData<typeof loader>();
+  const { installUrl } = useLoaderData<typeof loader>();
   const [showLanding, setShowLanding] = useState(false);
 
   useEffect(() => {
@@ -58,23 +58,13 @@ export default function App() {
           Points, VIP tiers, and referrals in one program — built around purchase
           cadence, not just order count.
         </p>
-        {showForm && (
-          <Form className={styles.form} method="post" action="/auth/login">
-            <label className={styles.label}>
-              <span>Shop domain</span>
-              <input
-                className={styles.input}
-                type="text"
-                name="shop"
-                placeholder="your-store.myshopify.com"
-                autoComplete="on"
-              />
-            </label>
-            <button className={styles.button} type="submit">
-              Open Habit
-            </button>
-          </Form>
-        )}
+        <a className={styles.button} href={installUrl}>
+          Install on Shopify
+        </a>
+        <p className={styles.text}>
+          Already installed? Open Habit from{" "}
+          <strong>Settings → Apps and sales channels</strong> in your Shopify admin.
+        </p>
         <ul className={styles.list}>
           <li>
             <strong>Points on every order.</strong> Members earn on purchase and
