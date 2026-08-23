@@ -5,7 +5,8 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { getOrCreateShopSettings } from "../lib/ledger.server";
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "../lib/brand";
+import { docsHref } from "../lib/brand";
+import { SupportFooter } from "../components/support-footer";
 
 const THEME_EDITOR = "shopify://admin/themes/current/editor";
 const CART_EMBED =
@@ -281,6 +282,9 @@ export default function Dashboard() {
                     <s-link href="/app/customers">View members</s-link>
                   )}
                   <s-link href="/app/settings">Review rates</s-link>
+                  <s-link href={docsHref("getting-started")} target="_blank">
+                    Setup guide
+                  </s-link>
                 </s-stack>
               </s-grid>
               <s-stack alignItems="center">
@@ -330,7 +334,10 @@ export default function Dashboard() {
                 />
               </s-grid>
               <s-paragraph color="subdued">
-                {completed} of {setupSteps.length} steps complete
+                {completed} of {setupSteps.length} steps complete.{" "}
+                <s-link href={docsHref("storefront")} target="_blank">
+                  Storefront docs
+                </s-link>
               </s-paragraph>
             </s-grid>
             <s-box
@@ -491,17 +498,15 @@ export default function Dashboard() {
             <s-link href={CART_EMBED} target="_blank">
               Enable cart embed
             </s-link>
+            <s-link href={docsHref("storefront")} target="_blank">
+              Help center
+            </s-link>
           </s-stack>
         </s-grid>
       </s-section>
 
       <s-section>
-        <s-stack alignItems="center">
-          <s-text>
-            Need help? Email{" "}
-            <s-link href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</s-link>.
-          </s-text>
-        </s-stack>
+        <SupportFooter />
       </s-section>
     </s-page>
   );

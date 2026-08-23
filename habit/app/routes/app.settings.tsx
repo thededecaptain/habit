@@ -16,7 +16,8 @@ import {
   redirectToSubscribe,
   shouldUseTestCharges,
 } from "../lib/billing.server";
-import { PRIVACY_URL, SUPPORT_EMAIL, SUPPORT_MAILTO, TERMS_URL } from "../lib/brand";
+import { docsHref } from "../lib/brand";
+import { SupportFooter } from "../components/support-footer";
 
 const LOYALTY_EVENT_NAMES = [
   "Points earned",
@@ -640,19 +641,18 @@ export default function Settings() {
             error={errors.notificationWebhookUrl}
             details="Habit POSTs JSON with eventName, customerEmail, and properties. Runs alongside Flow, not instead of it."
           />
+          <s-paragraph color="subdued">
+            Flow trigger payloads and webhook format are documented in the{" "}
+            <s-link href={docsHref("notifications")} target="_blank">
+              help center
+            </s-link>
+            .
+          </s-paragraph>
         </s-stack>
       </s-section>
 
       <s-section>
-        <s-stack alignItems="center">
-          <s-text>
-            Need help? Email{" "}
-            <s-link href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</s-link>.{" "}
-            <s-link href={PRIVACY_URL}>Privacy</s-link>
-            {" · "}
-            <s-link href={TERMS_URL}>Terms</s-link>
-          </s-text>
-        </s-stack>
+        <SupportFooter showLegal />
       </s-section>
 
       <ui-save-bar id={SAVE_BAR_ID}>

@@ -12,6 +12,8 @@ import {
   requestStandardSubscription,
   shouldUseHostedPlanPage,
 } from "../lib/billing.server";
+import { docsHref } from "../lib/brand";
+import { SupportFooter } from "../components/support-footer";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, billing, redirect, session } = await authenticate.admin(request);
@@ -101,9 +103,16 @@ export default function Billing() {
           </s-stack>
           <s-paragraph color="subdued">
             {trialDays}-day free trial. You will not be charged until the trial
-            ends. Cancel anytime from Settings.
+            ends. Cancel anytime from Settings.{" "}
+            <s-link href={docsHref("billing")} target="_blank">
+              Billing help
+            </s-link>
           </s-paragraph>
         </s-stack>
+      </s-section>
+
+      <s-section>
+        <SupportFooter />
       </s-section>
     </s-page>
   );

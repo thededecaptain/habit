@@ -4,6 +4,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { requireStandardPlan } from "../lib/billing.server";
+import { DOCS_URL } from "../lib/brand";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await requireStandardPlan(request);
@@ -22,6 +23,9 @@ export default function App() {
         <s-link href="/app/customers">Members</s-link>
         <s-link href="/app/tiers">VIP tiers</s-link>
         <s-link href="/app/settings">Settings</s-link>
+        <s-link href={DOCS_URL} target="_blank">
+          Help
+        </s-link>
       </s-app-nav>
       <Outlet />
     </AppProvider>
