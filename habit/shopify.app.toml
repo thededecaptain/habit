@@ -10,7 +10,7 @@ embedded = true
 automatically_update_urls_on_dev = false
 
 [webhooks]
-api_version = "2026-10"
+api_version = "2026-07"
 
   [webhooks.privacy_compliance]
   customer_deletion_url = "https://habit-production-9257.up.railway.app/webhooks/customers/redact"
@@ -39,7 +39,7 @@ api_version = "2026-10"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_orders,read_customers,read_discounts,write_discounts"
+scopes = "read_orders,read_customers,write_discounts"
 
 [auth]
 redirect_urls = [
