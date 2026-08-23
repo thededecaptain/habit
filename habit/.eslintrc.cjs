@@ -89,6 +89,15 @@ module.exports = {
         node: true,
       },
     },
+
+    // Admin routes use Polaris web components with loose event typings.
+    {
+      files: ["app/routes/**/*.{tsx,jsx}"],
+      rules: {
+        "@typescript-eslint/no-explicit-any": "off",
+        "react/no-unescaped-entities": "off",
+      },
+    },
   ],
   globals: {
     shopify: "readonly"

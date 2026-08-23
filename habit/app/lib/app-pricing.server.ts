@@ -33,7 +33,7 @@ export function planSelectionUrl(shop: string) {
   return `https://admin.shopify.com/store/${storeHandle}/charges/${APP_HANDLE}/pricing_plans`;
 }
 
-export function useHostedPlanPage(_partnerDevelopment?: boolean) {
+export function shouldUseHostedPlanPage() {
   // Only after Shopify App Pricing is enabled. The hosted
   // /charges/{handle}/pricing_plans URL 404s before that and Shopify
   // dumps the merchant on Settings → Apps.

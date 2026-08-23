@@ -111,7 +111,6 @@ export default function VipTiers() {
   // rather than onChange (fires on blur), since blur can race with a Save
   // button click inside a modal and lose the last-typed value.
   const [modalSession, setModalSession] = useState(0);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const pendingDeleteIdRef = useRef<string | null>(null);
   const errors = fetcher.data && "errors" in fetcher.data ? fetcher.data.errors ?? {} : {};
 
@@ -155,7 +154,6 @@ export default function VipTiers() {
 
   const confirmDelete = (id: string) => {
     pendingDeleteIdRef.current = id;
-    setPendingDeleteId(id);
     deleteModalRef.current?.showOverlay?.();
   };
 

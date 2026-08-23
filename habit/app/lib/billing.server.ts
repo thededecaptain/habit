@@ -3,12 +3,11 @@ import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import {
   captureWelcomePlanHandle,
-  clearAppPricingGrant,
   fetchAppPricingSubscription,
   loadAppPricingGrant,
   planSelectionUrl,
   rememberAppPricingGrant,
-  useHostedPlanPage,
+  shouldUseHostedPlanPage,
 } from "./app-pricing.server";
 import {
   STANDARD_PLAN,
@@ -30,7 +29,7 @@ export {
   captureWelcomePlanHandle,
   clearAppPricingGrant,
   planSelectionUrl,
-  useHostedPlanPage,
+  shouldUseHostedPlanPage,
 } from "./app-pricing.server";
 
 export type PaidAccess = {
@@ -203,7 +202,7 @@ export async function redirectToSubscribe(
   shopContext: ShopBillingContext,
   target: "_self" | "_top" = "_self",
 ) {
-  if (useHostedPlanPage(shopContext.partnerDevelopment)) {
+  if (shouldUseHostedPlanPage()) {
     return redirect(planSelectionUrl(shop), { target: "_top" });
   }
   return redirect("/app/billing", { target });

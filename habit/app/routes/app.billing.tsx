@@ -10,7 +10,7 @@ import {
   loadShopBillingContext,
   planSelectionUrl,
   requestStandardSubscription,
-  useHostedPlanPage,
+  shouldUseHostedPlanPage,
 } from "../lib/billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -26,7 +26,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw redirect("/app");
   }
 
-  if (useHostedPlanPage(shopContext.partnerDevelopment)) {
+  if (shouldUseHostedPlanPage()) {
     throw redirect(planSelectionUrl(session.shop), { target: "_top" });
   }
 
@@ -36,7 +36,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     trialDays: STANDARD_PLAN_TRIAL_DAYS,
     // Only after the real app handle is live and SHOPIFY_APP_PRICING is on.
     // /charges/habit 404s (handle is taken) and dumps merchants on Apps.
-    showHostedPlan: useHostedPlanPage(),
+    showHostedPlan: shouldUseHostedPlanPage(),
   };
 };
 

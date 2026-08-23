@@ -1,3 +1,4 @@
+import { captureServerException } from "./instrument.server";
 import { PassThrough } from "stream";
 import { renderToPipeableStream } from "react-dom/server";
 import { ServerRouter } from "react-router";
@@ -41,11 +42,12 @@ export default async function handleRequest(
           pipe(body);
         },
         onShellError(error) {
+          captureServerException(error, { phase: "onShellError" });
           reject(error);
         },
         onError(error) {
           responseStatusCode = 500;
-          console.error(error);
+          captureServerException(error, { phase: "onError" });
         },
       }
     );

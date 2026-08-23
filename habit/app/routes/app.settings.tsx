@@ -624,8 +624,7 @@ export default function Settings() {
         <s-stack direction="block" gap="base">
           <s-paragraph color="subdued">
             Habit emits loyalty events to Shopify Flow automatically. In Flow, create workflows
-            from these triggers — then route to Klaviyo, email, Slack, or any other app that
-            connects to Flow.
+            from these triggers — then route to email, Slack, or any app connected to Flow.
           </s-paragraph>
           <s-unordered-list>
             {LOYALTY_EVENT_NAMES.map((name) => (

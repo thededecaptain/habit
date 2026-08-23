@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: habit
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: habit/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Lint app code
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          SHOPIFY_API_KEY: placeholder-for-ci-build
+          SHOPIFY_API_SECRET: placeholder-for-ci-build
+          SCOPES: read_orders,read_customers,read_discounts,write_discounts
+          SHOPIFY_APP_URL: https://example.com
+
+      - name: Shopify Function tests
+        run: npm test
