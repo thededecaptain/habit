@@ -18,11 +18,11 @@ api_version = "2026-07"
   shop_deletion_url = "https://habit-production-9257.up.railway.app/webhooks/shop/redact"
 
   [[webhooks.subscriptions]]
-  uri = "/webhooks/app/scopes_update"
+  uri = "https://habit-production-9257.up.railway.app/webhooks/app/scopes_update"
   topics = [ "app/scopes_update" ]
 
   [[webhooks.subscriptions]]
-  uri = "/webhooks/app/uninstalled"
+  uri = "https://habit-production-9257.up.railway.app/webhooks/app/uninstalled"
   topics = [ "app/uninstalled" ]
 
   [[webhooks.subscriptions]]
@@ -30,11 +30,11 @@ api_version = "2026-07"
   topics = [ "app_subscriptions/update" ]
 
   [[webhooks.subscriptions]]
-  uri = "/webhooks/orders/paid"
+  uri = "https://habit-production-9257.up.railway.app/webhooks/orders/paid"
   topics = [ "orders/paid" ]
 
   [[webhooks.subscriptions]]
-  uri = "/webhooks/refunds/create"
+  uri = "https://habit-production-9257.up.railway.app/webhooks/refunds/create"
   topics = [ "refunds/create" ]
 
 [access_scopes]
