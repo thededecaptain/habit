@@ -2,29 +2,19 @@ import type { Prisma } from "@prisma/client";
 import { Prisma as PrismaNS } from "@prisma/client";
 import prisma from "../db.server";
 import { unauthenticated } from "../shopify.server";
-import {
-  buildFlowPayload,
-  emitFlowTrigger,
-  FLOW_TRIGGER_HANDLES,
-} from "./flow.server";
+import { buildFlowPayload, emitFlowTrigger } from "./flow.server";
+import { FLOW_TRIGGER_HANDLES } from "./loyalty-events.server";
 
-export const EVENT_POINTS_EARNED = "Habit: Points Earned";
-export const EVENT_TIER_UPGRADED = "Habit: Tier Upgraded";
-export const EVENT_REFERRAL_SENT = "Habit: Referral Sent";
-export const EVENT_REFERRAL_WELCOME = "Habit: Referral Welcome Bonus";
-export const EVENT_POINTS_REDEEMED = "Habit: Points Redeemed";
-export const EVENT_POINTS_EXPIRING_SOON = "Habit: Points Expiring Soon";
-export const EVENT_POINTS_EXPIRED = "Habit: Points Expired";
-
-export const LOYALTY_EVENT_NAMES = [
+export {
   EVENT_POINTS_EARNED,
-  EVENT_TIER_UPGRADED,
+  EVENT_POINTS_EXPIRED,
+  EVENT_POINTS_EXPIRING_SOON,
+  EVENT_POINTS_REDEEMED,
   EVENT_REFERRAL_SENT,
   EVENT_REFERRAL_WELCOME,
-  EVENT_POINTS_REDEEMED,
-  EVENT_POINTS_EXPIRING_SOON,
-  EVENT_POINTS_EXPIRED,
-] as const;
+  EVENT_TIER_UPGRADED,
+  LOYALTY_EVENT_NAMES,
+} from "./loyalty-events.server";
 
 const MAX_ATTEMPTS = 8;
 

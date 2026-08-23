@@ -7,17 +7,9 @@ import {
   EVENT_REFERRAL_SENT,
   EVENT_REFERRAL_WELCOME,
   EVENT_TIER_UPGRADED,
-} from "./notifications.server";
+} from "./loyalty-events.server";
 
-export const FLOW_TRIGGER_HANDLES: Record<string, string> = {
-  [EVENT_POINTS_EARNED]: "points-earned",
-  [EVENT_TIER_UPGRADED]: "tier-upgraded",
-  [EVENT_REFERRAL_SENT]: "referral-sent",
-  [EVENT_REFERRAL_WELCOME]: "referral-welcome-bonus",
-  [EVENT_POINTS_REDEEMED]: "points-redeemed",
-  [EVENT_POINTS_EXPIRING_SOON]: "points-expiring-soon",
-  [EVENT_POINTS_EXPIRED]: "points-expired",
-};
+export { FLOW_TRIGGER_HANDLES } from "./loyalty-events.server";
 
 function legacyId(value: unknown): number | null {
   if (value == null || value === "") return null;
