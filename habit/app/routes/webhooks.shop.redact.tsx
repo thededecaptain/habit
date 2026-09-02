@@ -1,14 +1,14 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
 import { captureServerException } from "../instrument.server";
 import { purgeShopData } from "../lib/shop-data.server";
+import { authenticateWebhookSafe } from "../lib/webhook-auth.server";
 
 /**
  * GDPR mandatory webhook: 48 hours after a merchant uninstalls, Shopify asks
  * us to erase all of the shop's data.
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, payload, topic } = await authenticate.webhook(request);
+  const { shop, payload, topic } = await authenticateWebhookSafe(request);
   const shopDomain =
     shop || String((payload as { shop_domain?: string }).shop_domain ?? "");
   console.log(`Received ${topic} webhook for ${shopDomain}`, payload);

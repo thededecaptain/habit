@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { authenticateWebhookSafe } from "../lib/webhook-auth.server";
 
 /**
  * GDPR mandatory webhook: a customer has requested their data. We don't
@@ -8,18 +8,19 @@ import db from "../db.server";
  * so the merchant can be notified manually within the required window.
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, payload, topic } = await authenticate.webhook(request);
+  const { shop, payload, topic } = await authenticateWebhookSafe(request);
   console.log(`Received ${topic} webhook for ${shop}`, payload);
 
-  const shopifyCustomerId = String(payload.customer?.id ?? "");
+  const customer = payload.customer as { id?: string | number } | undefined;
+  const shopifyCustomerId = String(customer?.id ?? "");
   if (shopifyCustomerId) {
-    const customer = await db.customer.findUnique({
+    const record = await db.customer.findUnique({
       where: { shop_shopifyCustomerId: { shop, shopifyCustomerId } },
       include: { pointTransactions: true, ownedReferralCodes: true },
     });
     console.log(
       `Data request for shop=${shop} customer=${shopifyCustomerId}: ${
-        customer ? "found ledger data" : "no ledger data on file"
+        record ? "found ledger data" : "no ledger data on file"
       }`,
     );
   }
