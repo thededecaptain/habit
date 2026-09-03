@@ -1,3 +1,7 @@
+.habit-widget--design-preview {
+  margin: 1rem auto;
+}
+
 .habit-widget {
   --habit-accent: var(--color-button, #121212);
   --habit-on-accent: var(--color-button-text, #fff);

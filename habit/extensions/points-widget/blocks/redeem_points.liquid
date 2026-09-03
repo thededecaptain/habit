@@ -2,8 +2,9 @@
 
 {% if customer or request.design_mode %}
 <div
-  class="habit-widget"
+  class="habit-widget{% if request.design_mode %} habit-widget--design-preview{% endif %}"
   data-habit-redeem
+  {% if request.design_mode %}data-habit-design-mode="true"{% endif %}
   data-proxy-url="/apps/habit"
   data-cart-subtotal-cents="{{ cart.total_price }}"
   data-applied-points="{{ cart.attributes.points_to_redeem | default: 0 }}"
@@ -13,6 +14,32 @@
   "
   {{ block.shopify_attributes }}
 >
+  {% if request.design_mode %}
+    <div data-habit-redeem-body>
+      <p class="habit-widget__eyebrow">{{ block.settings.heading | default: 'Redeem points' }}</p>
+      <p class="habit-widget__balance">
+        <span data-habit-balance>1,250</span>
+        <span class="habit-widget__balance-label">points</span>
+        <span class="habit-widget__value" data-habit-value>· $12.50</span>
+      </p>
+      <p class="habit-widget__context" data-habit-redeem-balance-text>
+        Preview — shown to logged-in customers with points.
+      </p>
+      <div class="habit-redeem__field">
+        <label class="habit-redeem__label" for="habit-redeem-input">
+          {{ block.settings.input_label | default: 'Points to redeem' }}
+        </label>
+        <input type="number" id="habit-redeem-input" data-habit-redeem-input value="100" disabled>
+        <p class="habit-widget__next-tier" data-habit-redeem-details>Up to 500 points ($5.00).</p>
+      </div>
+      <p class="habit-widget__tier" data-habit-redeem-preview>Choose how many points to redeem.</p>
+      <div class="habit-redeem__actions">
+        <button type="button" class="habit-widget__button" data-habit-redeem-apply disabled>
+          {{ block.settings.apply_text | default: 'Apply points' }}
+        </button>
+      </div>
+    </div>
+  {% else %}
   <div data-habit-loading class="habit-widget__state">
     <p>{{ block.settings.loading_text | default: 'Checking your rewards…' }}</p>
   </div>
@@ -55,6 +82,7 @@
 
     <p class="habit-widget__status" data-habit-redeem-status role="status"></p>
   </div>
+  {% endif %}
 </div>
 {% endif %}
 

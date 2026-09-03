@@ -18,7 +18,24 @@ function money(n) {
   return `$${Number(n).toFixed(2)}`;
 }
 
+function EditorPreview() {
+  return (
+    <s-section heading="Redeem points">
+      <s-stack direction="block" gap="base">
+        <s-text type="strong">1,250 points · {money(12.5)} to spend</s-text>
+        <s-text color="subdued">Preview — shown to logged-in customers with points.</s-text>
+        <s-number-field label="Points to redeem" value="100" disabled />
+        <s-text color="subdued">Up to 500 points ({money(5)}).</s-text>
+        <s-button variant="primary" disabled>
+          Apply points
+        </s-button>
+      </s-stack>
+    </s-section>
+  );
+}
+
 function Extension() {
+  const inEditor = shopify.extension?.editor?.type === "checkout";
   const canSetMetafields = shopify.instructions.value.metafields.canSetCartMetafields;
   const customer = shopify.buyerIdentity?.customer?.value;
   const subtotal = shopify.cost.subtotalAmount.value;
@@ -76,8 +93,12 @@ function Extension() {
         ? points.pointsBalance / points.redemptionRate
         : 0;
 
-  if (!canSetMetafields) {
+  if (!canSetMetafields && !inEditor) {
     return null;
+  }
+
+  if (inEditor && (loading || !customer?.id || !points?.loggedIn)) {
+    return <EditorPreview />;
   }
 
   if (loading) {
@@ -90,11 +111,11 @@ function Extension() {
   }
 
   if (!customer?.id || !points?.loggedIn) {
-    return null;
+    return inEditor ? <EditorPreview /> : null;
   }
 
   if (points.pointsBalance < points.minRedeemablePoints && appliedPoints <= 0) {
-    return null;
+    return inEditor ? <EditorPreview /> : null;
   }
 
   async function applyRedemption() {

@@ -36,6 +36,7 @@
   function initRedeem(root, cart) {
     if (!root || root.getAttribute("data-habit-ready") === "1") return;
     root.setAttribute("data-habit-ready", "1");
+    if ((window.Shopify && Shopify.designMode) || root.getAttribute("data-habit-design-mode") === "true") return;
 
     var proxy = root.getAttribute("data-proxy-url") || "/apps/habit";
     var loading = q(root, "[data-habit-loading]");
@@ -91,12 +92,9 @@
         if (balanceEl) balanceEl.textContent = balance.toLocaleString();
         if (valueEl && rate) {
           valueEl.hidden = false;
-          valueEl.textContent =
-            "· " + money(data.balanceValue != null ? data.balanceValue : balance / rate);
+          valueEl.textContent = "· " + money(data.balanceValue != null ? data.balanceValue : balance / rate);
         }
-        if (balanceText) {
-          balanceText.textContent = "Redeem on this order. Discount appears at checkout.";
-        }
+        if (balanceText) balanceText.textContent = "Redeem on this order. Discount appears at checkout.";
         if (!input || !applyBtn) return;
 
         input.min = "0";
@@ -105,8 +103,7 @@
         input.value = String(Math.min(applied, maxPts) || (applied > 0 ? applied : min));
         if (details) {
           details.hidden = false;
-          details.textContent =
-            "Up to " + maxPts.toLocaleString() + " points (" + money(maxPts / rate) + ").";
+          details.textContent = "Up to " + maxPts.toLocaleString() + " points (" + money(maxPts / rate) + ").";
         }
 
         function paintApplied() {
@@ -127,9 +124,7 @@
           if (preview) {
             preview.hidden = false;
             preview.textContent =
-              n > 0
-                ? "You’ll save " + money(n / rate) + " at checkout"
-                : "Choose how many points to redeem.";
+              n > 0 ? "You'll save " + money(n / rate) + " at checkout" : "Choose how many points to redeem.";
           }
           applyBtn.textContent = applied > 0 ? "Update points" : "Apply points";
         }
@@ -160,10 +155,7 @@
             .then(function (updated) {
               applied = n;
               root.setAttribute("data-applied-points", String(n));
-              if (status) {
-                status.textContent =
-                  n > 0 ? "Saved. Your discount shows at checkout." : "Redemption removed.";
-              }
+              if (status) status.textContent = n > 0 ? "Saved. Discount shows at checkout." : "Redemption removed.";
               paintApplied();
               previewText();
               busy(false);
@@ -171,7 +163,7 @@
             })
             .catch(function () {
               busy(false);
-              if (status) status.textContent = "Couldn't update your cart — try again.";
+              if (status) status.textContent = "Couldn't update cart — try again.";
             });
         }
 
@@ -187,7 +179,7 @@
         }
       })
       .catch(function () {
-        if (loading) loading.textContent = "Couldn't load your rewards right now.";
+        if (loading) loading.textContent = "Couldn't load rewards.";
       });
   }
 
@@ -218,10 +210,7 @@
     var widget = cloneTemplate();
     if (!widget) return;
     widget.setAttribute("data-cart-subtotal-cents", String(cart.total_price || 0));
-    widget.setAttribute(
-      "data-applied-points",
-      String((cart.attributes && cart.attributes.points_to_redeem) || 0),
-    );
+    widget.setAttribute("data-applied-points", String((cart.attributes && cart.attributes.points_to_redeem) || 0));
     var ctas = btn.closest(".cart__ctas");
     if (ctas && ctas.parentElement) ctas.parentElement.insertBefore(widget, ctas);
     else parent.insertBefore(widget, btn);

@@ -1,0 +1,40 @@
+TEST STORE: [your-store].myshopify.com
+Install Habit (habit-loyalty) from the listing or use pre-installed copy.
+Plan: Standard — $49 USD every 30 days, 30-day free trial.
+Help: docs.gethabitloyalty.com | Support: support@gethabitloyalty.com
+
+SETUP
+1. Install → complete OAuth → land on embedded Home.
+2. Billing → Start 30-day free trial → approve in Shopify. App screens lock until trial is active.
+3. Shopify admin → Settings → Checkout → customize → enable Habit “Redeem points” checkout block.
+4. Habit Home → Setup guide → Open theme editor + Enable cart embed (product-page widget + cart redeem; do not add widget to header).
+5. Checkout redemption needs logged-in customer (Protected customer data — auto on dev stores).
+
+PROGRAM (Settings): Default 1 point per $1, 100 points = $1 off. Save and confirm values persist.
+
+BILLING TEST
+• Start trial → Home, Members, VIP tiers, Settings all accessible.
+• Settings → Cancel subscription → confirm.
+• Billing → start a new trial to verify resubscribe/reinstall.
+
+EARN POINTS
+• Customer account with email → place paid test order while logged in.
+• Habit → Members → customer appears with balance + EARN ledger row.
+
+REFUND
+• Refund the order in Shopify admin → Habit ledger reverses earned points.
+
+REDEEM AT CHECKOUT
+• Same customer with points → checkout → Redeem points → Apply points → discount on total → complete order.
+• Members → lower balance + REDEEM entry.
+
+NOTIFICATIONS
+Habit does not send email. Events go to Shopify Flow (7 triggers) and/or optional webhook.
+• Settings → Notification webhook URL (webhook.site works).
+• Place order → verify JSON POST: eventName, customerEmail, properties.
+Flow requires Advanced/Plus; webhook alone is enough for review.
+
+OPTIONAL: VIP tiers (Tiers); referrals (code at checkout/cart).
+
+UNINSTALL: Cancel in Settings (self-serve). GDPR customer/shop redact webhooks configured.
+Notes: Single flat plan. No Klaviyo API keys in app. Privacy/terms: gethabitloyalty.com
