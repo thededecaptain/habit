@@ -1,7 +1,3 @@
-NOTE: this repository is public. Keep real credentials out of this file — paste
-them into the Partner Dashboard testing-instructions field, or use the
-git-ignored SHOPIFY_REVIEW_TESTING_INSTRUCTIONS.local.txt copy.
-
 App: Habit (habit-loyalty) — points, VIP tiers and referrals for Shopify stores.
 Help: https://docs.gethabitloyalty.com | Support: support@gethabitloyalty.com
 
@@ -21,13 +17,9 @@ Storefront customer sign-in uses Shopify's NEW CUSTOMER ACCOUNTS, which are
 passwordless — sign in with any email you control and Shopify emails a 6-digit
 code. No customer password exists for us to provide.
 
-Optional fallback — our pre-configured store, if you prefer existing data:
-  Store: habit-dev-store.myshopify.com
-  Admin: https://admin.shopify.com/store/habit-dev-store
-  Admin email:    [FILL IN]
-  Admin password: [FILL IN]
-  Storefront password (development stores are always password-protected): [FILL IN]
-  Demo member: gidafabian@gmail.com — 950 points ($9.50), Gold tier, $1,250 spent.
+Everything below can be completed end to end on a store you create, using only
+your own Shopify login. If anything here does not reproduce, please tell us what
+you saw and we will fix it immediately.
 
 ————————————————————————
 1. INSTALL AND START THE TRIAL
