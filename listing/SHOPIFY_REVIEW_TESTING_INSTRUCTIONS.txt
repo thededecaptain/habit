@@ -1,53 +1,29 @@
+Habit is a loyalty program: customers earn points on orders and redeem them for a discount in the cart or at checkout.
+
 CREDENTIALS
-• No separate login: Habit is embedded and authenticates via Shopify OAuth at install. There is no username/password to provide.
+• No separate login — Habit is embedded and authenticates via Shopify OAuth at install. There is no username/password to provide.
 • Install on any development store you control. The 30-day trial is a TEST charge (never billed) and unlocks every feature.
 • Storefront login uses new customer accounts (passwordless): use any email you control, Shopify sends a 6-digit code.
 
 1. INSTALL
-1.1 Install → approve OAuth → land on embedded Home.
-1.2 Approve Standard ($49 USD/30 days, 30-day free trial). Screens unlock once active.
+Install Habit → approve OAuth → approve Standard ($49 USD/30 days) with the 30-day free trial. All screens unlock immediately.
 
 2. CHECKOUT EXTENSION
-2.1 Add a product → go to checkout.
-2.2 "Redeem points" renders under the discount code field automatically, no setup. Signed out: program info + referral field. Signed in: balance + Apply points.
-2.3 Optional: Settings → Checkout → Customize → Apps → "redeem-points" to move it.
+Add a product → go to checkout. "Redeem points" renders under the discount code field automatically, with no setup.
+• Signed out: program info + referral code field.
+• Signed in: points balance + Apply points.
 
 3. CUSTOMER ACCOUNT EXTENSION
-3.1 Sign in on the storefront (6-digit email code).
-3.2 Profile → "Your rewards": balance + tier progress. Orders → rewards banner.
-3.3 Optional: Settings → Customer accounts → Configurations → Customize → Profile → Apps → "account-rewards".
+Sign in on the storefront (6-digit code). Profile shows "Your rewards" with the live balance; Orders shows a rewards banner.
 
-4. ONLINE STORE
-4.1 Habit Home → Setup guide → Open theme editor.
-4.2 Add "Loyalty points" block to the product template (not the header).
-4.3 Enable "Redeem points in cart" app embed. Cart redeem works on every plan.
+Both blocks can also be placed manually: Settings → Checkout → Customize → Apps, and Settings → Customer accounts → Configurations → Customize.
 
-5. SETTINGS
-5.1 Habit → Settings. Defaults: 1 point per $1, 100 points = $1 off.
-5.2 Edit rate/minimum/max share/expiry → Save → reload to confirm.
+4. EARN
+Signed in, place a paid test order (Bogus Gateway). Habit → Members: the customer appears with a balance and an EARN row.
 
-6. EARN
-6.1 Signed in, place a paid test order (Bogus Gateway).
-6.2 Habit → Members: customer appears with balance + EARN row.
+5. REDEEM
+With 100+ points, start a second order. Apply points in the cart or at checkout → the discount appears on the total → complete the order. Members shows the lower balance and a REDEEM row.
 
-7. REDEEM
-7.1 With 100+ points, start a second order.
-7.2 Apply points in cart or checkout → discount on total → complete order.
-7.3 Members: lower balance + REDEEM row.
-
-8. REFUND
-8.1 Refund that order in admin → Habit reverses the points automatically (REFUND_REVERSAL row).
-
-9. TIERS AND REFERRALS
-9.1 Habit → Tiers: add a tier with a spend threshold + earn multiplier; qualifying members earn more.
-9.2 Referrals: a member gets a code on the account page; a new customer enters it in cart/checkout; both get bonus points.
-
-10. NOTIFICATIONS
-10.1 No email is sent. Events go to Shopify Flow (7 triggers) and/or a webhook.
-10.2 Settings → Notification webhook URL (webhook.site) → place an order → verify JSON POST: eventName, customerEmail, properties. Flow needs Advanced/Plus.
-
-11. BILLING AND UNINSTALL
-11.1 Settings → Cancel subscription (self-service). Reinstall + new trial keeps data.
-11.2 Uninstall from Apps. GDPR customers/redact, customers/data_request, shop/redact implemented.
-
+Defaults: 1 point per $1, 100 points = $1 off (Habit → Settings).
+Cancel anytime: Habit → Settings → Cancel subscription (self-service).
 Help: docs.gethabitloyalty.com | Support: support@gethabitloyalty.com
