@@ -1,88 +1,106 @@
-NOTE: this repository is public. Keep the real values out of this file — paste
+NOTE: this repository is public. Keep real credentials out of this file — paste
 them into the Partner Dashboard testing-instructions field, or use the
 git-ignored SHOPIFY_REVIEW_TESTING_INSTRUCTIONS.local.txt copy.
 
-TEST STORE CREDENTIALS (required)
-Store: habit-dev-store.myshopify.com
-Admin URL: https://admin.shopify.com/store/habit-dev-store
-Admin email: [FILL IN]
-Admin password: [FILL IN]
-Storefront password (the online store is password-protected): [FILL IN]
-
-Storefront sign-in: this store uses NEW CUSTOMER ACCOUNTS, which are passwordless.
-Sign in at https://shopify.com/102718406837/account with any email address you
-control — Shopify emails you a 6-digit code. No customer password exists or is
-required. A signed-in customer with no history correctly shows a "0 points"
-state; place a test order to see points appear.
-
-Pre-loaded demo member (visible in the admin under Habit → Members):
-  gidafabian@gmail.com — 950 points ($9.50), Gold tier, $1,250 lifetime spend.
-
-App: Habit (habit-loyalty)
-Plan: Standard — $49 USD every 30 days, 30-day free trial (already started on the test store).
+App: Habit (habit-loyalty) — points, VIP tiers and referrals for Shopify stores.
 Help: https://docs.gethabitloyalty.com | Support: support@gethabitloyalty.com
 
 ————————————————————————
-VERIFY EXTENSIONS FIRST (5.6.1)
+CREDENTIALS (4.5.4 / 4.5.5)
 ————————————————————————
-Checkout — “Redeem points”
-1. As a buyer, add a product and go to checkout.
-2. In the order summary (next to Discount code), confirm the Habit “Redeem points” / “Rewards” UI is visible.
-   • Guest: shows a sign-in prompt + referral code field.
-   • Signed-in test customer with points: shows balance + Apply points.
-3. If it is NOT visible: admin → Settings → Checkout → Customize → Apps → add the
-   “Redeem points” block → Save, then reload checkout. (In-checkout extensions
-   require checkout extensibility; on non-Plus stores use the cart redeem path below.)
+Habit has NO separate login. It is an embedded Shopify app: you authenticate
+with Shopify OAuth during install, and every screen lives inside Shopify admin.
+There is no Habit username or password to supply.
 
-Customer account — “Your rewards”
-1. Storefront → log in with the storefront customer above (new customer accounts).
-2. Orders (order index) shows a Habit rewards announcement; Profile shows the
-   “Your rewards” section with the live balance.
-3. If Profile is empty: admin → Settings → Customer accounts → Configurations →
-   Customize → Profile → Apps → add “account-rewards” → Save, then reload the
-   profile page. (The block auto-places only on a fresh install.)
+Install Habit on any development store you control and test it there — the app
+is fully self-service and needs no data or setup from us. The 30-day free trial
+is created as a TEST charge on development stores, costs nothing, and unlocks
+100% of the feature set (there is one flat plan, no feature tiers).
 
-Cart redeem (works on every plan)
-• Storefront → add a product → open the cart → the Habit “Redeem points” embed lets
-  the signed-in customer apply points. Enable via Online Store → Themes → Customize →
-  App embeds → “Redeem points in cart” if it is off.
+Storefront customer sign-in uses Shopify's NEW CUSTOMER ACCOUNTS, which are
+passwordless — sign in with any email you control and Shopify emails a 6-digit
+code. No customer password exists for us to provide.
 
-————————————————————————
-SETUP
-————————————————————————
-1. Install → complete OAuth → land on embedded Home.
-2. Billing → Start 30-day free trial → approve in Shopify (if not already active). App screens lock until trial is active.
-3. Habit Home → Setup guide → Open theme editor + Enable cart embed (product-page widget + cart redeem; do not add widget to header).
-4. Checkout redemption of points requires the signed-in storefront customer (Protected customer data — auto on dev stores).
-
-PROGRAM (Settings): Default 1 point per $1, 100 points = $1 off. Save and confirm values persist.
+Optional fallback — our pre-configured store, if you prefer existing data:
+  Store: habit-dev-store.myshopify.com
+  Admin: https://admin.shopify.com/store/habit-dev-store
+  Admin email:    [FILL IN]
+  Admin password: [FILL IN]
+  Storefront password (development stores are always password-protected): [FILL IN]
+  Demo member: gidafabian@gmail.com — 950 points ($9.50), Gold tier, $1,250 spent.
 
 ————————————————————————
-FEATURE TESTS
+1. INSTALL AND START THE TRIAL
 ————————————————————————
-BILLING
-• Start trial → Home, Members, VIP tiers, Settings all accessible.
-• Settings → Cancel subscription → confirm.
-• Billing → start a new trial to verify resubscribe/reinstall.
+1. Install Habit on your development store and approve the OAuth scopes.
+2. You land on the embedded Home with a setup guide.
+3. Approve the Standard plan — $49 USD / 30 days with a 30-day free trial.
+   On a development store this is a test charge; you are never billed.
+   All features unlock immediately; nothing is gated behind the paid period.
 
-EARN POINTS
-• Log in as the storefront customer → place a paid test order.
-• Habit → Members → customer appears with balance + EARN ledger row.
+————————————————————————
+2. VERIFY THE EXTENSIONS (5.6.1)
+————————————————————————
+Checkout — "Redeem points"
+• Add any product, go to checkout, and look at the order summary.
+  Habit renders directly under the discount code field, with no setup required.
+  - Signed out: rewards panel explaining the program + referral code field.
+  - Signed in:  live points balance and an Apply points control.
+• It is also available as a checkout block: Settings → Checkout → Customize →
+  Apps → "redeem-points", if you want to place it somewhere else.
+
+Customer account — "Your rewards"
+• Sign in to the storefront (passwordless code) and open the account pages.
+  - Profile:  "Your rewards" section with the live balance and tier progress.
+  - Orders:   rewards announcement banner.
+• Also available as a block: Settings → Customer accounts → Configurations →
+  Customize → Profile → Apps → "account-rewards".
+
+Online store — product page and cart
+• Home → setup guide → Open theme editor. Add the "Loyalty points" app block to
+  the product template, and enable the "Redeem points in cart" app embed.
+• Product page shows what a shopper earns; the cart lets a signed-in member
+  apply points. The cart path works on every plan, including non-Plus stores.
+
+————————————————————————
+3. FEATURE TESTS
+————————————————————————
+EARN
+• Sign in on the storefront, place a paid test order (Bogus Gateway / test mode).
+• Habit → Members: the customer appears with a balance and an EARN ledger row.
+
+REDEEM
+• With 100+ points, start a second order.
+• Apply points in the cart or at checkout → discount appears on the order total.
+• Complete the order → Members shows the reduced balance and a REDEEM row.
 
 REFUND
-• Refund the order in Shopify admin → Habit ledger reverses earned points.
+• Refund that order in Shopify admin → Habit reverses the points automatically
+  and writes a REFUND_REVERSAL row. No manual clawback needed.
 
-REDEEM AT CHECKOUT
-• Same signed-in customer with points → checkout → Redeem points → Apply points → discount on total → complete order.
-• Members → lower balance + REDEEM entry.
+VIP TIERS
+• Habit → Tiers → create a tier with a spend threshold and an earn multiplier.
+• Members qualifying by lifetime spend move up and earn at the higher rate.
+
+REFERRALS
+• A member gets a referral code on the account page; a new customer enters it
+  in the cart or at checkout. Both sides receive bonus points after the order.
+
+PROGRAM SETTINGS
+• Habit → Settings: points per dollar, redemption rate, minimum redemption,
+  maximum share of an order, and point expiry. Save and reload to confirm.
 
 NOTIFICATIONS
-Habit does not send email. Events go to Shopify Flow (7 triggers) and/or optional webhook.
-• Settings → Notification webhook URL (webhook.site works).
-• Place order → verify JSON POST: eventName, customerEmail, properties.
-Flow requires Advanced/Plus; webhook alone is enough for review.
+• Habit sends no email. Events go to Shopify Flow (7 triggers) and/or a webhook.
+• Settings → Notification webhook URL (https://webhook.site works). Place an
+  order and confirm the JSON POST: eventName, customerEmail, properties.
+• Flow requires Advanced/Plus; the webhook alone is enough to verify this.
 
-OPTIONAL: VIP tiers (Tiers); referrals (code at checkout/cart).
-
-UNINSTALL: Cancel in Settings (self-serve). GDPR customer/shop redact webhooks configured.
-Privacy/terms: https://gethabitloyalty.com
+————————————————————————
+4. BILLING AND UNINSTALL
+————————————————————————
+• Settings → Cancel subscription — self-service, no support contact required.
+• Reinstalling and starting a new trial works and restores existing data.
+• Uninstall from the Apps page. GDPR customers/redact, customers/data_request
+  and shop/redact webhooks are implemented.
+• Privacy policy and terms: https://gethabitloyalty.com
