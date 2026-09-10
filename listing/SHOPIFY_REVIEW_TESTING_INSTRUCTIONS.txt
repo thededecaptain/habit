@@ -8,20 +8,26 @@ CREDENTIALS
 1. INSTALL
 Install Habit → approve OAuth → approve Standard ($49 USD/30 days) with the 30-day free trial. All screens unlock immediately.
 
-2. CHECKOUT EXTENSION
-Add a product → go to checkout. "Redeem points" renders under the discount code field automatically, with no setup.
+2. ACTIVATE THE EXTENSIONS (required first — Shopify requires merchant activation)
+2.1 Checkout: Settings → Checkout → Customize → Apps → add "redeem-points" → Save.
+2.2 Customer accounts: Settings → Customer accounts → Configurations → Customize → Profile → Apps → add "account-rewards" → Save.
+
+3. CHECKOUT EXTENSION
+Add a product → go to checkout. "Redeem points" appears in the order summary, under the discount code field.
 • Signed out: program info + referral code field.
 • Signed in: points balance + Apply points.
 
-3. CUSTOMER ACCOUNT EXTENSION
+4. CUSTOMER ACCOUNT EXTENSION
 Sign in on the storefront (6-digit code). Profile shows "Your rewards" with the live balance; Orders shows a rewards banner.
 
-Both blocks can also be placed manually: Settings → Checkout → Customize → Apps, and Settings → Customer accounts → Configurations → Customize.
+5. ONLINE STORE (no activation needed)
+Product page shows "Your rewards — Earn N points on this product".
+Habit Home → Setup guide → theme editor → enable the "Redeem points in cart" app embed. The cart redeem UI shows for signed-in customers.
 
-4. EARN
+6. EARN
 Signed in, place a paid test order (Bogus Gateway). Habit → Members: the customer appears with a balance and an EARN row.
 
-5. REDEEM
+7. REDEEM
 With 100+ points, start a second order. Apply points in the cart or at checkout → the discount appears on the total → complete the order. Members shows the lower balance and a REDEEM row.
 
 Defaults: 1 point per $1, 100 points = $1 off (Habit → Settings).
