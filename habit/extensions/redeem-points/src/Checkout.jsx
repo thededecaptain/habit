@@ -2,9 +2,10 @@ import "@shopify/ui-extensions/preact";
 import { render } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 
-// Baked in at deploy via Shopify CLI; production fallback keeps published builds working.
-const APP_URL =
-  process.env.SHOPIFY_APP_URL || "https://habit-production-9257.up.railway.app";
+// Must be a literal: the extension sandbox has no `process` global and the CLI
+// does not substitute env vars, so reading process.env here throws before the
+// extension can render. Update this if the app URL changes.
+const APP_URL = "https://habit-production-9257.up.railway.app";
 
 export default async () => {
   render(<Extension />, document.body);
@@ -36,12 +37,14 @@ function EditorPreview() {
   );
 }
 
-function GuestPanel({ referralCode, setReferralCode, referralStatus, onApplyReferral, canWrite }) {
+function GuestPanel({ referralCode, setReferralCode, referralStatus, onApplyReferral, canWrite, signedIn }) {
   return (
     <s-section heading="Rewards">
       <s-stack direction="block" gap="base">
-        <s-banner tone="info">
-          Sign in to see your points balance and redeem them on this order.
+        <s-banner tone={signedIn ? "warning" : "info"}>
+          {signedIn
+            ? "We couldn't load your points balance right now. Your points are safe — try again in a moment."
+            : "Sign in to see your points balance and redeem them on this order."}
         </s-banner>
         <s-text color="subdued">
           Members earn points on every purchase and can apply them as a discount at checkout.
@@ -200,7 +203,8 @@ function Extension() {
     );
   }
 
-  // Guests / unsigned buyers: still render (review requirement 5.6.1) + referral entry.
+  // Guests, and signed-in buyers whose balance failed to load, still render
+  // something (review requirement 5.6.1) plus the referral entry.
   if (!customer?.id || !points?.loggedIn) {
     return (
       <GuestPanel
@@ -209,6 +213,7 @@ function Extension() {
         referralStatus={referralStatus}
         onApplyReferral={applyReferralCode}
         canWrite={canSetMetafields}
+        signedIn={Boolean(customer?.id)}
       />
     );
   }

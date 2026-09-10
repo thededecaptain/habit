@@ -2,9 +2,10 @@ import "@shopify/ui-extensions/preact";
 import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 
-// Baked in at deploy via Shopify CLI; production fallback keeps published builds working.
-const APP_URL =
-  process.env.SHOPIFY_APP_URL || "https://habit-production-9257.up.railway.app";
+// Must be a literal: the extension sandbox has no `process` global and the CLI
+// does not substitute env vars, so reading process.env here throws before the
+// extension can render. Update this if the app URL changes.
+const APP_URL = "https://habit-production-9257.up.railway.app";
 
 export default async () => {
   render(<Announcement />, document.body);
