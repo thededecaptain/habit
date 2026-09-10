@@ -66,7 +66,12 @@ None identified from codebase review.
 2. Paste listing copy from `listing/APP_STORE_LISTING.md` into Partner Dashboard.
 3. Update gethabitloyalty.com per `listing/MARKETING_SITE_CHECKLIST.md`.
 4. Set `SENTRY_DSN` on Railway.
-5. Provide reviewers a dev store with trial active and a test customer with points.
+5. Provide reviewers a **dev store** with:
+   - Trial active
+   - A test **customer account** (email + password) that has points
+   - Checkout extensibility enabled (Plus or developer preview)
+   - Paste real admin + storefront credentials into `listing/SHOPIFY_REVIEW_TESTING_INSTRUCTIONS.txt` (4.5.4 / 4.5.5)
+6. Deploy updated checkout + customer account extensions (`shopify app deploy`) so static targets ship before resubmitting.
 
 ## Resources
 

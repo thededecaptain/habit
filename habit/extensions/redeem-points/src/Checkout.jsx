@@ -2,7 +2,9 @@ import "@shopify/ui-extensions/preact";
 import { render } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 
-const APP_URL = process.env.SHOPIFY_APP_URL;
+// Baked in at deploy via Shopify CLI; production fallback keeps published builds working.
+const APP_URL =
+  process.env.SHOPIFY_APP_URL || "https://habit-production-9257.up.railway.app";
 
 export default async () => {
   render(<Extension />, document.body);
@@ -29,6 +31,57 @@ function EditorPreview() {
         <s-button variant="primary" disabled>
           Apply points
         </s-button>
+      </s-stack>
+    </s-section>
+  );
+}
+
+function GuestPanel({ referralCode, setReferralCode, referralStatus, onApplyReferral, canWrite }) {
+  return (
+    <s-section heading="Rewards">
+      <s-stack direction="block" gap="base">
+        <s-banner tone="info">
+          Sign in to see your points balance and redeem them on this order.
+        </s-banner>
+        <s-text color="subdued">
+          Members earn points on every purchase and can apply them as a discount at checkout.
+        </s-text>
+        <s-details>
+          <s-summary>Have a referral code?</s-summary>
+          <s-stack direction="block" gap="small-200">
+            <s-text-field
+              label="Referral code"
+              labelAccessibilityVisibility="exclusive"
+              placeholder="Enter a code"
+              value={referralCode}
+              disabled={!canWrite}
+              onChange={(event) => {
+                const raw = event.currentTarget.value;
+                setReferralCode(typeof raw === "string" ? raw : "");
+              }}
+            />
+            <s-button disabled={!canWrite} onClick={onApplyReferral}>
+              Apply code
+            </s-button>
+            {referralStatus ? <s-text color="subdued">{referralStatus}</s-text> : null}
+          </s-stack>
+        </s-details>
+      </s-stack>
+    </s-section>
+  );
+}
+
+function BalanceOnlyPanel({ points, balanceValue, reason }) {
+  return (
+    <s-section heading="Redeem points">
+      <s-stack direction="block" gap="base">
+        <s-text type="strong">
+          {points.pointsBalance.toLocaleString()} points · {money(balanceValue)} to spend
+        </s-text>
+        <s-banner tone="info">{reason}</s-banner>
+        <s-text color="subdued">
+          Earn more on this order — points are added after payment.
+        </s-text>
       </s-stack>
     </s-section>
   );
@@ -93,32 +146,8 @@ function Extension() {
         ? points.pointsBalance / points.redemptionRate
         : 0;
 
-  if (!canSetMetafields && !inEditor) {
-    return null;
-  }
-
-  if (inEditor && (loading || !customer?.id || !points?.loggedIn)) {
-    return <EditorPreview />;
-  }
-
-  if (loading) {
-    return (
-      <s-stack direction="inline" gap="small-200" alignItems="center">
-        <s-spinner size="small" accessibilityLabel="Loading rewards" />
-        <s-text color="subdued">Checking your rewards…</s-text>
-      </s-stack>
-    );
-  }
-
-  if (!customer?.id || !points?.loggedIn) {
-    return inEditor ? <EditorPreview /> : null;
-  }
-
-  if (points.pointsBalance < points.minRedeemablePoints && appliedPoints <= 0) {
-    return inEditor ? <EditorPreview /> : null;
-  }
-
   async function applyRedemption() {
+    if (!canSetMetafields) return;
     setApplying(true);
     try {
       const clamped = Math.max(0, Math.min(redeemInput, maxRedeemable));
@@ -141,7 +170,7 @@ function Extension() {
   }
 
   async function applyReferralCode() {
-    if (!referralCode.trim()) return;
+    if (!canSetMetafields || !referralCode.trim()) return;
     setReferralStatus("Saving…");
     const result = await shopify.applyMetafieldChange({
       type: "updateCartMetafield",
@@ -153,6 +182,59 @@ function Extension() {
       },
     });
     setReferralStatus(result.type === "error" ? "Couldn't save the code — try again." : "Applied. Verified after checkout.");
+  }
+
+  // Always show something in the checkout editor so merchants/reviewers can place and verify the block.
+  if (inEditor && (loading || !customer?.id || !points?.loggedIn)) {
+    return <EditorPreview />;
+  }
+
+  if (loading) {
+    return (
+      <s-section heading="Redeem points">
+        <s-stack direction="inline" gap="small-200" alignItems="center">
+          <s-spinner size="small" accessibilityLabel="Loading rewards" />
+          <s-text color="subdued">Checking your rewards…</s-text>
+        </s-stack>
+      </s-section>
+    );
+  }
+
+  // Guests / unsigned buyers: still render (review requirement 5.6.1) + referral entry.
+  if (!customer?.id || !points?.loggedIn) {
+    return (
+      <GuestPanel
+        referralCode={referralCode}
+        setReferralCode={setReferralCode}
+        referralStatus={referralStatus}
+        onApplyReferral={applyReferralCode}
+        canWrite={canSetMetafields}
+      />
+    );
+  }
+
+  if (points.pointsBalance < points.minRedeemablePoints && appliedPoints <= 0) {
+    return (
+      <BalanceOnlyPanel
+        points={points}
+        balanceValue={balanceValue}
+        reason={
+          points.pointsBalance <= 0
+            ? "You don't have points to redeem yet. Complete this order to start earning."
+            : `You need at least ${points.minRedeemablePoints.toLocaleString()} points to redeem.`
+        }
+      />
+    );
+  }
+
+  if (maxRedeemable <= 0 && appliedPoints <= 0) {
+    return (
+      <BalanceOnlyPanel
+        points={points}
+        balanceValue={balanceValue}
+        reason="Points can't be applied to this order total right now."
+      />
+    );
   }
 
   return (
@@ -177,8 +259,10 @@ function Extension() {
           min={0}
           max={maxRedeemable}
           step={points.minRedeemablePoints || 1}
-          onChange={(e) => {
-            const next = Number(e.currentTarget.value);
+          disabled={!canSetMetafields}
+          onChange={(event) => {
+            const raw = event.currentTarget.value;
+            const next = raw === "" ? 0 : Number(raw);
             setRedeemInput(Number.isFinite(next) ? next : 0);
           }}
         />
@@ -194,7 +278,7 @@ function Extension() {
 
         <s-button
           variant="primary"
-          disabled={applying || redeemInput === appliedPoints}
+          disabled={!canSetMetafields || applying || redeemInput === appliedPoints}
           onClick={applyRedemption}
         >
           {appliedPoints > 0 ? "Update points" : "Apply points"}
@@ -208,12 +292,15 @@ function Extension() {
               labelAccessibilityVisibility="exclusive"
               placeholder="Enter a code"
               value={referralCode}
-              onChange={(e) => {
-                const next = e.currentTarget.value;
-                setReferralCode(typeof next === "string" ? next : "");
+              disabled={!canSetMetafields}
+              onChange={(event) => {
+                const raw = event.currentTarget.value;
+                setReferralCode(typeof raw === "string" ? raw : "");
               }}
             />
-            <s-button onClick={applyReferralCode}>Apply code</s-button>
+            <s-button disabled={!canSetMetafields} onClick={applyReferralCode}>
+              Apply code
+            </s-button>
             {referralStatus ? <s-text color="subdued">{referralStatus}</s-text> : null}
           </s-stack>
         </s-details>

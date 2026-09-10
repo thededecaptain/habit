@@ -15,9 +15,16 @@ uid = "34d6ac90-46a8-218d-e246-47cc8e5669e2508374e0"
 # and the file that contains your extension’s source code. Learn more:
 # https://shopify.dev/docs/api/checkout-ui-extensions/latest/extension-targets-overview
 
+# Block: merchants place this anywhere in checkout (Plus / extensibility stores).
 [[extensions.targeting]]
 module = "./src/Checkout.jsx"
 target = "purchase.checkout.block.render"
+
+# Static: auto-renders next to the discount code field so the UI is visible
+# without requiring the merchant to add an app block (App Store 5.6.1).
+[[extensions.targeting]]
+module = "./src/Checkout.jsx"
+target = "purchase.checkout.reductions.render-after"
 
 [extensions.capabilities]
 # Needed to call our app's backend for the buyer's live points balance.

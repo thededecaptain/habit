@@ -80,6 +80,9 @@ model ShopSettings {
   // be dismissible and not reappear once completed).
   onboardingDismissedAt DateTime?
 
+  // Manual setup-guide steps the merchant marked complete (JSON string array).
+  onboardingCompletedSteps String @default("[]")
+
   // GID of the Shopify Function-powered automatic discount used for point
   // redemption at checkout (BFS 5.5.1: discounts must use discount functions).
   // Null until successfully created via discountAutomaticAppCreate.

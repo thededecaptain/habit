@@ -1,31 +1,66 @@
-TEST STORE: [your-store].myshopify.com
-Install Habit (habit-loyalty) from the listing or use pre-installed copy.
-Plan: Standard — $49 USD every 30 days, 30-day free trial.
-Help: docs.gethabitloyalty.com | Support: support@gethabitloyalty.com
+TEST STORE CREDENTIALS (required)
+Store: [YOUR-STORE].myshopify.com
+Admin email: [FILL IN]
+Admin password: [FILL IN]
+Storefront customer email: [FILL IN — logged-in member who already has points]
+Storefront customer password: [FILL IN]
 
+App: Habit (habit-loyalty)
+Plan: Standard — $49 USD every 30 days, 30-day free trial (already started on the test store).
+Help: https://docs.gethabitloyalty.com | Support: support@gethabitloyalty.com
+
+————————————————————————
+VERIFY EXTENSIONS FIRST (5.6.1)
+————————————————————————
+Checkout — “Redeem points”
+1. As a buyer, add a product and go to checkout.
+2. In the order summary (next to Discount code), confirm the Habit “Redeem points” / “Rewards” UI is visible.
+   • Guest: shows a sign-in prompt + referral code field.
+   • Signed-in test customer with points: shows balance + Apply points.
+3. If it is NOT visible: admin → Settings → Checkout → Customize → Apps → add the
+   “Redeem points” block → Save, then reload checkout. (In-checkout extensions
+   require checkout extensibility; on non-Plus stores use the cart redeem path below.)
+
+Customer account — “Your rewards”
+1. Storefront → log in with the storefront customer above (new customer accounts).
+2. Orders (order index) shows a Habit rewards announcement; Profile shows the
+   “Your rewards” section with the live balance.
+3. If Profile is empty: admin → Settings → Customer accounts → Configurations →
+   Customize → Profile → Apps → add “account-rewards” → Save, then reload the
+   profile page. (The block auto-places only on a fresh install.)
+
+Cart redeem (works on every plan)
+• Storefront → add a product → open the cart → the Habit “Redeem points” embed lets
+  the signed-in customer apply points. Enable via Online Store → Themes → Customize →
+  App embeds → “Redeem points in cart” if it is off.
+
+————————————————————————
 SETUP
+————————————————————————
 1. Install → complete OAuth → land on embedded Home.
-2. Billing → Start 30-day free trial → approve in Shopify. App screens lock until trial is active.
-3. Shopify admin → Settings → Checkout → customize → enable Habit “Redeem points” checkout block.
-4. Habit Home → Setup guide → Open theme editor + Enable cart embed (product-page widget + cart redeem; do not add widget to header).
-5. Checkout redemption needs logged-in customer (Protected customer data — auto on dev stores).
+2. Billing → Start 30-day free trial → approve in Shopify (if not already active). App screens lock until trial is active.
+3. Habit Home → Setup guide → Open theme editor + Enable cart embed (product-page widget + cart redeem; do not add widget to header).
+4. Checkout redemption of points requires the signed-in storefront customer (Protected customer data — auto on dev stores).
 
 PROGRAM (Settings): Default 1 point per $1, 100 points = $1 off. Save and confirm values persist.
 
-BILLING TEST
+————————————————————————
+FEATURE TESTS
+————————————————————————
+BILLING
 • Start trial → Home, Members, VIP tiers, Settings all accessible.
 • Settings → Cancel subscription → confirm.
 • Billing → start a new trial to verify resubscribe/reinstall.
 
 EARN POINTS
-• Customer account with email → place paid test order while logged in.
+• Log in as the storefront customer → place a paid test order.
 • Habit → Members → customer appears with balance + EARN ledger row.
 
 REFUND
 • Refund the order in Shopify admin → Habit ledger reverses earned points.
 
 REDEEM AT CHECKOUT
-• Same customer with points → checkout → Redeem points → Apply points → discount on total → complete order.
+• Same signed-in customer with points → checkout → Redeem points → Apply points → discount on total → complete order.
 • Members → lower balance + REDEEM entry.
 
 NOTIFICATIONS
@@ -37,4 +72,4 @@ Flow requires Advanced/Plus; webhook alone is enough for review.
 OPTIONAL: VIP tiers (Tiers); referrals (code at checkout/cart).
 
 UNINSTALL: Cancel in Settings (self-serve). GDPR customer/shop redact webhooks configured.
-Notes: Single flat plan. No Klaviyo API keys in app. Privacy/terms: gethabitloyalty.com
+Privacy/terms: https://gethabitloyalty.com

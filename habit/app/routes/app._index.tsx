@@ -11,9 +11,24 @@ import { SupportFooter } from "../components/support-footer";
 const THEME_EDITOR = "shopify://admin/themes/current/editor";
 const CART_EMBED =
   "shopify://admin/themes/current/editor?context=apps&activateAppId=d4f4bcdc36a90b4443c2e6fde31bbd80/redeem_points_embed";
+const CHECKOUT_EDITOR = "shopify://admin/settings/checkout/editor";
+const ACCOUNT_EDITOR = "shopify://admin/settings/customer_accounts";
 const CALLOUT_IMAGE = "/setup-callout.png";
 
+const MANUAL_STEPS = ["product_widget", "cart_embed", "checkout_redeem", "account_rewards"] as const;
+type ManualStepId = (typeof MANUAL_STEPS)[number];
+
+function parseCompletedSteps(raw: string | null | undefined): string[] {
+  try {
+    const parsed = JSON.parse(raw || "[]");
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 type SetupStepData = {
+  id?: ManualStepId;
   title: string;
   description: string;
   done: boolean;
@@ -76,6 +91,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       pointsPerDollar: Number(settings.pointsPerDollar),
       redemptionRate: Number(settings.redemptionRate),
     },
+    completedSteps: parseCompletedSteps(settings.onboardingCompletedSteps),
   };
 };
 
@@ -96,6 +112,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       where: { shop },
       data: { referralVelocityDismissedAt: new Date() },
     });
+  }
+
+  if (formData.get("intent") === "complete-step" || formData.get("intent") === "uncomplete-step") {
+    const step = String(formData.get("step") || "");
+    if (MANUAL_STEPS.includes(step as ManualStepId)) {
+      const settings = await getOrCreateShopSettings(shop);
+      const current = parseCompletedSteps(settings.onboardingCompletedSteps);
+      const next =
+        formData.get("intent") === "complete-step"
+          ? [...new Set([...current, step])]
+          : current.filter((id) => id !== step);
+      await db.shopSettings.update({
+        where: { shop },
+        data: { onboardingCompletedSteps: JSON.stringify(next) },
+      });
+    }
   }
 
   return null;
@@ -125,10 +157,12 @@ function SetupStep({
   step,
   expanded,
   onToggle,
+  onMark,
 }: {
   step: SetupStepData;
   expanded: boolean;
   onToggle: () => void;
+  onMark: (stepId: ManualStepId, done: boolean) => void;
 }) {
   return (
     <s-box>
@@ -153,7 +187,17 @@ function SetupStep({
         <s-box padding="base" background="subdued" borderRadius="base">
           <s-stack direction="block" gap="small-200">
             <s-paragraph>{step.description}</s-paragraph>
-            {!step.done ? <StepAction href={step.actionHref} label={step.actionLabel} /> : null}
+            <s-stack direction="inline" gap="small-200" alignItems="center">
+              {!step.done ? <StepAction href={step.actionHref} label={step.actionLabel} /> : null}
+              {step.id ? (
+                <s-button
+                  variant={step.done ? "tertiary" : "secondary"}
+                  onClick={() => onMark(step.id!, !step.done)}
+                >
+                  {step.done ? "Mark as not done" : "Mark as done"}
+                </s-button>
+              ) : null}
+            </s-stack>
           </s-stack>
         </s-box>
       </s-box>
@@ -162,9 +206,17 @@ function SetupStep({
 }
 
 export default function Dashboard() {
-  const { onboardingDismissed, showVelocityAlert, hasCustomTiers, ratesReviewed, metrics, settings } =
-    useLoaderData<typeof loader>();
+  const {
+    onboardingDismissed,
+    showVelocityAlert,
+    hasCustomTiers,
+    ratesReviewed,
+    metrics,
+    settings,
+    completedSteps,
+  } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
+  const marked = new Set(completedSteps);
 
   const setupSteps: SetupStepData[] = [
     {
@@ -175,19 +227,39 @@ export default function Dashboard() {
       actionLabel: "Open settings",
     },
     {
+      id: "product_widget",
       title: "Add the product widget",
       description:
         "Add it on product pages only — not the header. It shows balance, what this product earns, and a link to redeem in cart.",
-      done: false,
+      done: marked.has("product_widget"),
       actionHref: THEME_EDITOR,
       actionLabel: "Open theme editor",
     },
     {
+      id: "cart_embed",
       title: "Turn on Redeem points in cart",
       description: "Lets members apply points from the cart drawer — the primary path for non-Plus stores.",
-      done: false,
+      done: marked.has("cart_embed"),
       actionHref: CART_EMBED,
       actionLabel: "Enable app embed",
+    },
+    {
+      id: "checkout_redeem",
+      title: "Confirm Redeem points at checkout",
+      description:
+        "On Plus / checkout-extensibility stores, Redeem points appears next to the discount code. Open the checkout editor to verify and optionally place the app block.",
+      done: marked.has("checkout_redeem"),
+      actionHref: CHECKOUT_EDITOR,
+      actionLabel: "Open checkout editor",
+    },
+    {
+      id: "account_rewards",
+      title: "Show rewards in customer accounts",
+      description:
+        "Open Settings → Customer accounts → Configurations → Customize. On Profile, add Habit “account-rewards” if it is not already visible under Addresses.",
+      done: marked.has("account_rewards"),
+      actionHref: ACCOUNT_EDITOR,
+      actionLabel: "Open customer accounts",
     },
     {
       title: "Optionally add VIP tiers",
@@ -213,6 +285,13 @@ export default function Dashboard() {
 
   const dismissOnboarding = () => {
     fetcher.submit({ intent: "dismiss-onboarding" }, { method: "POST" });
+  };
+
+  const markStep = (stepId: ManualStepId, done: boolean) => {
+    fetcher.submit(
+      { intent: done ? "complete-step" : "uncomplete-step", step: stepId },
+      { method: "POST" },
+    );
   };
 
   const liabilityDollars = metrics.outstandingLiability / (settings.redemptionRate || 1);
@@ -353,6 +432,7 @@ export default function Dashboard() {
                     step={step}
                     expanded={openStep === index}
                     onToggle={() => setOpenStep((current) => (current === index ? -1 : index))}
+                    onMark={markStep}
                   />
                 </s-box>
               ))}

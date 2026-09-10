@@ -2,7 +2,9 @@ import "@shopify/ui-extensions/preact";
 import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 
-const APP_URL = process.env.SHOPIFY_APP_URL;
+// Baked in at deploy via Shopify CLI; production fallback keeps published builds working.
+const APP_URL =
+  process.env.SHOPIFY_APP_URL || "https://habit-production-9257.up.railway.app";
 
 const TYPE_LABELS = {
   EARN: "Earned",
@@ -16,6 +18,22 @@ const TYPE_LABELS = {
 export default async () => {
   render(<Extension />, document.body);
 };
+
+function inEditor() {
+  return Boolean(shopify.extension?.editor);
+}
+
+function EditorPreview() {
+  return (
+    <s-section heading="Your rewards">
+      <s-stack direction="block" gap="base">
+        <s-heading>1,250 points</s-heading>
+        <s-text>$12.50 to spend</s-text>
+        <s-text color="subdued">Preview — signed-in customers see their live balance here.</s-text>
+      </s-stack>
+    </s-section>
+  );
+}
 
 function money(n) {
   return `$${Number(n).toFixed(2)}`;
@@ -40,6 +58,7 @@ function Extension() {
   const [referralStatus, setReferralStatus] = useState("");
 
   useEffect(() => {
+    if (inEditor()) return;
     let cancelled = false;
     (async () => {
       try {
@@ -47,6 +66,9 @@ function Extension() {
         const response = await fetch(`${APP_URL}/account-api/points`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
         const json = await response.json();
         if (!cancelled) setData(json);
       } catch (err) {
@@ -81,6 +103,11 @@ function Extension() {
     }
   }
 
+  if (inEditor()) {
+    return <EditorPreview />;
+  }
+
+  // Always render a section so the extension is visible to reviewers (5.6.1).
   if (loading) {
     return (
       <s-section heading="Your rewards">
@@ -95,7 +122,12 @@ function Extension() {
   if (error || !data?.loggedIn) {
     return (
       <s-section heading="Your rewards">
-        <s-banner tone="warning">{error || "Sign in to see your points balance."}</s-banner>
+        <s-stack direction="block" gap="base">
+          <s-banner tone="warning">{error || "Sign in to see your points balance."}</s-banner>
+          <s-text color="subdued">
+            Habit tracks points you earn on purchases. Redeem them from cart or checkout when signed in.
+          </s-text>
+        </s-stack>
       </s-section>
     );
   }
@@ -113,7 +145,7 @@ function Extension() {
         <s-stack direction="block" gap="small-200">
           <s-heading>{balance.toLocaleString()} points</s-heading>
           <s-text>{money(value)} to spend</s-text>
-          <s-text color="subdued">Redeem from your cart before checkout.</s-text>
+          <s-text color="subdued">Redeem from your cart before checkout, or apply points at checkout.</s-text>
           {data.tierName ? <s-text>{data.tierName} tier</s-text> : null}
           {nextLine ? <s-text color="subdued">{nextLine}</s-text> : null}
           {showExpiryWarning ? (
@@ -141,7 +173,9 @@ function Extension() {
               </s-stack>
             ))}
           </s-stack>
-        ) : null}
+        ) : (
+          <s-text color="subdued">No activity yet — place an order to start earning.</s-text>
+        )}
 
         <s-details>
           <s-summary>Share with friends</s-summary>

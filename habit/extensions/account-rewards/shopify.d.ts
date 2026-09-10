@@ -7,3 +7,11 @@ declare module './src/Profile.jsx' {
     | import('@shopify/ui-extensions/customer-account.profile.addresses.render-after').Api;
   const globalThis: { shopify: typeof shopify };
 }
+
+//@ts-ignore
+declare module './src/Announcement.jsx' {
+  const shopify:
+    | import('@shopify/ui-extensions/customer-account.profile.announcement.render').Api
+    | import('@shopify/ui-extensions/customer-account.order-index.announcement.render').Api;
+  const globalThis: { shopify: typeof shopify };
+}

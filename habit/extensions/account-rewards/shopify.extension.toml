@@ -9,13 +9,26 @@ handle = "account-rewards"
 uid = "b19d469d-b6c1-f124-843e-505eac11069a2c72bae3"
 type = "ui_extension"
 
+# Block: merchants can place on the profile page. PROFILE1 only applies on a
+# fresh install; existing installs still need the block added in the editor.
 [[extensions.targeting]]
 module = "./src/Profile.jsx"
 target = "customer-account.profile.block.render"
+default_placement = "PROFILE1"
 
+# Static: always visible under addresses on the profile page.
 [[extensions.targeting]]
 module = "./src/Profile.jsx"
 target = "customer-account.profile.addresses.render-after"
+
+# Static announcements (root must be s-announcement) — visible without placement.
+[[extensions.targeting]]
+module = "./src/Announcement.jsx"
+target = "customer-account.profile.announcement.render"
+
+[[extensions.targeting]]
+module = "./src/Announcement.jsx"
+target = "customer-account.order-index.announcement.render"
 
 [extensions.capabilities]
 # Needed to call the app backend for the signed-in customer's live balance.
