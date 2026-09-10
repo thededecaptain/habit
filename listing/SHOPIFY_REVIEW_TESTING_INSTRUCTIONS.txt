@@ -1,98 +1,75 @@
-App: Habit (habit-loyalty) — points, VIP tiers and referrals for Shopify stores.
-Help: https://docs.gethabitloyalty.com | Support: support@gethabitloyalty.com
+CREDENTIALS
+• Habit is an embedded Shopify app with no separate login — you authenticate via
+  Shopify OAuth at install. There is no username or password to provide.
+• Install on any development store you control. The 30-day free trial is a TEST
+  charge on dev stores (never billed) and unlocks every feature. One flat plan,
+  no feature tiers.
+• Storefront sign-in uses new customer accounts (passwordless): use any email you
+  control and Shopify emails you a 6-digit code.
 
-————————————————————————
-CREDENTIALS (4.5.4 / 4.5.5)
-————————————————————————
-Habit has NO separate login. It is an embedded Shopify app: you authenticate
-with Shopify OAuth during install, and every screen lives inside Shopify admin.
-There is no Habit username or password to supply.
+1. INSTALL
+1.1 Install Habit → approve OAuth scopes → you land on the embedded Home.
+1.2 Approve Standard ($49 USD / 30 days, 30-day free trial).
+1.3 App screens unlock as soon as the trial is active.
 
-Install Habit on any development store you control and test it there — the app
-is fully self-service and needs no data or setup from us. The 30-day free trial
-is created as a TEST charge on development stores, costs nothing, and unlocks
-100% of the feature set (there is one flat plan, no feature tiers).
+2. CHECKOUT EXTENSION
+2.1 Add any product → go to checkout.
+2.2 "Redeem points" renders under the discount code field automatically — no
+    setup required.
+    • Signed out: program info + referral code field.
+    • Signed in: live points balance + Apply points.
+2.3 Optional: Settings → Checkout → Customize → Apps → "redeem-points" to place
+    the block somewhere else.
 
-Storefront customer sign-in uses Shopify's NEW CUSTOMER ACCOUNTS, which are
-passwordless — sign in with any email you control and Shopify emails a 6-digit
-code. No customer password exists for us to provide.
+3. CUSTOMER ACCOUNT EXTENSION
+3.1 Sign in on the storefront (6-digit email code).
+3.2 Profile → "Your rewards" shows the balance and tier progress.
+3.3 Orders → rewards announcement banner.
+3.4 Optional: Settings → Customer accounts → Configurations → Customize →
+    Profile → Apps → "account-rewards".
 
-Everything below can be completed end to end on a store you create, using only
-your own Shopify login. If anything here does not reproduce, please tell us what
-you saw and we will fix it immediately.
+4. ONLINE STORE
+4.1 Habit Home → Setup guide → Open theme editor.
+4.2 Add the "Loyalty points" block to the product template (not the header).
+4.3 Enable the "Redeem points in cart" app embed.
+4.4 Cart redemption works on every plan, including non-Plus stores.
 
-————————————————————————
-1. INSTALL AND START THE TRIAL
-————————————————————————
-1. Install Habit on your development store and approve the OAuth scopes.
-2. You land on the embedded Home with a setup guide.
-3. Approve the Standard plan — $49 USD / 30 days with a 30-day free trial.
-   On a development store this is a test charge; you are never billed.
-   All features unlock immediately; nothing is gated behind the paid period.
+5. PROGRAM SETTINGS
+5.1 Habit → Settings. Defaults: 1 point per $1, 100 points = $1 off.
+5.2 Change points per dollar, redemption rate, minimum redemption, max share of
+    an order, or point expiry → Save → reload to confirm values persist.
 
-————————————————————————
-2. VERIFY THE EXTENSIONS (5.6.1)
-————————————————————————
-Checkout — "Redeem points"
-• Add any product, go to checkout, and look at the order summary.
-  Habit renders directly under the discount code field, with no setup required.
-  - Signed out: rewards panel explaining the program + referral code field.
-  - Signed in:  live points balance and an Apply points control.
-• It is also available as a checkout block: Settings → Checkout → Customize →
-  Apps → "redeem-points", if you want to place it somewhere else.
+6. EARN POINTS
+6.1 Signed in on the storefront, place a paid test order (Bogus Gateway).
+6.2 Habit → Members: the customer appears with a balance and an EARN ledger row.
 
-Customer account — "Your rewards"
-• Sign in to the storefront (passwordless code) and open the account pages.
-  - Profile:  "Your rewards" section with the live balance and tier progress.
-  - Orders:   rewards announcement banner.
-• Also available as a block: Settings → Customer accounts → Configurations →
-  Customize → Profile → Apps → "account-rewards".
+7. REDEEM POINTS
+7.1 With 100+ points, start a second order.
+7.2 Apply points in the cart or at checkout → discount appears on the total.
+7.3 Complete the order → Members shows the lower balance and a REDEEM row.
 
-Online store — product page and cart
-• Home → setup guide → Open theme editor. Add the "Loyalty points" app block to
-  the product template, and enable the "Redeem points in cart" app embed.
-• Product page shows what a shopper earns; the cart lets a signed-in member
-  apply points. The cart path works on every plan, including non-Plus stores.
+8. REFUND
+8.1 Refund that order in Shopify admin.
+8.2 Habit reverses the points automatically (REFUND_REVERSAL row). No manual
+    clawback needed.
 
-————————————————————————
-3. FEATURE TESTS
-————————————————————————
-EARN
-• Sign in on the storefront, place a paid test order (Bogus Gateway / test mode).
-• Habit → Members: the customer appears with a balance and an EARN ledger row.
+9. VIP TIERS AND REFERRALS
+9.1 Habit → Tiers: create a tier with a spend threshold and an earn multiplier.
+9.2 Members qualifying by lifetime spend earn at the higher rate.
+9.3 Referrals: a member gets a code on the account page; a new customer enters it
+    in the cart or at checkout; both sides get bonus points after the order.
 
-REDEEM
-• With 100+ points, start a second order.
-• Apply points in the cart or at checkout → discount appears on the order total.
-• Complete the order → Members shows the reduced balance and a REDEEM row.
+10. NOTIFICATIONS
+10.1 Habit sends no email. Events go to Shopify Flow (7 triggers) and/or a webhook.
+10.2 Settings → Notification webhook URL (https://webhook.site works).
+10.3 Place an order → verify the JSON POST: eventName, customerEmail, properties.
+10.4 Flow requires Advanced/Plus; the webhook alone is enough to verify this.
 
-REFUND
-• Refund that order in Shopify admin → Habit reverses the points automatically
-  and writes a REFUND_REVERSAL row. No manual clawback needed.
+11. BILLING AND UNINSTALL
+11.1 Settings → Cancel subscription (self-service, no support contact needed).
+11.2 Reinstalling and starting a new trial restores existing data.
+11.3 Uninstall from the Apps page. GDPR customers/redact, customers/data_request
+     and shop/redact webhooks are implemented.
 
-VIP TIERS
-• Habit → Tiers → create a tier with a spend threshold and an earn multiplier.
-• Members qualifying by lifetime spend move up and earn at the higher rate.
-
-REFERRALS
-• A member gets a referral code on the account page; a new customer enters it
-  in the cart or at checkout. Both sides receive bonus points after the order.
-
-PROGRAM SETTINGS
-• Habit → Settings: points per dollar, redemption rate, minimum redemption,
-  maximum share of an order, and point expiry. Save and reload to confirm.
-
-NOTIFICATIONS
-• Habit sends no email. Events go to Shopify Flow (7 triggers) and/or a webhook.
-• Settings → Notification webhook URL (https://webhook.site works). Place an
-  order and confirm the JSON POST: eventName, customerEmail, properties.
-• Flow requires Advanced/Plus; the webhook alone is enough to verify this.
-
-————————————————————————
-4. BILLING AND UNINSTALL
-————————————————————————
-• Settings → Cancel subscription — self-service, no support contact required.
-• Reinstalling and starting a new trial works and restores existing data.
-• Uninstall from the Apps page. GDPR customers/redact, customers/data_request
-  and shop/redact webhooks are implemented.
-• Privacy policy and terms: https://gethabitloyalty.com
+Help: docs.gethabitloyalty.com | Support: support@gethabitloyalty.com
+Privacy and terms: gethabitloyalty.com
