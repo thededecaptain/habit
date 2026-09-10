@@ -1,8 +1,13 @@
+NOTE: this repository is public. Keep the real values out of this file — paste
+them into the Partner Dashboard testing-instructions field, or use the
+git-ignored SHOPIFY_REVIEW_TESTING_INSTRUCTIONS.local.txt copy.
+
 TEST STORE CREDENTIALS (required)
 Store: habit-dev-store.myshopify.com
 Admin URL: https://admin.shopify.com/store/habit-dev-store
 Admin email: [FILL IN]
 Admin password: [FILL IN]
+Storefront password (the online store is password-protected): [FILL IN]
 
 Storefront sign-in: this store uses NEW CUSTOMER ACCOUNTS, which are passwordless.
 Sign in at https://shopify.com/102718406837/account with any email address you

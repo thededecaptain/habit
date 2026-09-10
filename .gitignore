@@ -1,2 +1,6 @@
 .DS_Store
 .cursor/
+
+# Filled-in submission text containing real store credentials. The committed
+# instructions keep placeholders because this repository is public.
+*.local.txt
