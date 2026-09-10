@@ -1,9 +1,17 @@
 TEST STORE CREDENTIALS (required)
-Store: [YOUR-STORE].myshopify.com
+Store: habit-dev-store.myshopify.com
+Admin URL: https://admin.shopify.com/store/habit-dev-store
 Admin email: [FILL IN]
 Admin password: [FILL IN]
-Storefront customer email: [FILL IN — logged-in member who already has points]
-Storefront customer password: [FILL IN]
+
+Storefront sign-in: this store uses NEW CUSTOMER ACCOUNTS, which are passwordless.
+Sign in at https://shopify.com/102718406837/account with any email address you
+control — Shopify emails you a 6-digit code. No customer password exists or is
+required. A signed-in customer with no history correctly shows a "0 points"
+state; place a test order to see points appear.
+
+Pre-loaded demo member (visible in the admin under Habit → Members):
+  gidafabian@gmail.com — 950 points ($9.50), Gold tier, $1,250 lifetime spend.
 
 App: Habit (habit-loyalty)
 Plan: Standard — $49 USD every 30 days, 30-day free trial (already started on the test store).
