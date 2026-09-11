@@ -27,9 +27,9 @@ async function snapshot(shop: string, shopifyCustomerId: string) {
  * (not a query param) so it can't be spoofed.
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { request: proxied, originalUserAgent } = allowExtensionUserAgent(request);
-  console.log(`account-api/points from user agent: ${originalUserAgent}`);
-  const { sessionToken, cors } = await authenticate.public.customerAccount(proxied);
+  const { sessionToken, cors } = await authenticate.public.customerAccount(
+    allowExtensionUserAgent(request),
+  );
   const shop = shopFromDest(String(sessionToken.dest));
   const customerId = customerIdFromToken(sessionToken.sub);
 
@@ -42,7 +42,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { sessionToken, cors } = await authenticate.public.customerAccount(
-    allowExtensionUserAgent(request).request,
+    allowExtensionUserAgent(request),
   );
   const shop = shopFromDest(String(sessionToken.dest));
   const customerId = customerIdFromToken(sessionToken.sub);

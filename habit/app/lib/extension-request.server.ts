@@ -1,26 +1,22 @@
 /**
- * Shopify does not let a UI extension talk to us directly — it proxies the
- * fetch through its own infrastructure, which sends its own User-Agent. That
- * User-Agent is classified as a bot by the isbot check inside
- * authenticate.public.*, which answers 410 Gone before our loader ever runs,
- * so the extension silently gets no data. The library only allowlists
- * "Shopify POS/" and "Shopify Mobile/".
+ * authenticate.public.* runs the request's User-Agent through isbot and
+ * answers 410 Gone before our loader sees it. isbot flags more than crawlers:
+ * any Electron-based or embedded browser matches, because "Electron" appears
+ * in its User-Agent. A customer in one of those would silently get no rewards
+ * data.
  *
- * These endpoints are only ever called by our extensions and still require a
- * valid session token, so bot filtering buys us nothing here. Relabel the
- * request so it reaches the session token check.
+ * These endpoints only ever serve our own UI extensions and are secured by
+ * session token validation, so bot filtering adds nothing — a crawler has no
+ * valid token. Relabel the agent so the request reaches that check, and let
+ * the token decide.
  */
-const ALLOWLISTED_USER_AGENT = "Shopify Mobile/habit-extension-proxy";
+const ALLOWLISTED_USER_AGENT = "Shopify Mobile/habit-extension";
 
 export function allowExtensionUserAgent(request: Request) {
   const headers = new Headers(request.headers);
-  const original = headers.get("User-Agent") ?? "";
   headers.set("User-Agent", ALLOWLISTED_USER_AGENT);
 
   // Body is intentionally dropped: these handlers read the session token and
   // query string only, and cloning a stream here would need duplex plumbing.
-  return {
-    request: new Request(request.url, { method: request.method, headers }),
-    originalUserAgent: original,
-  };
+  return new Request(request.url, { method: request.method, headers });
 }
