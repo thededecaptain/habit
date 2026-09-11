@@ -1,6 +1,9 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
-import { allowExtensionUserAgent } from "../lib/extension-request.server";
+import {
+  allowExtensionUserAgent,
+  shopFromSessionTokenDest,
+} from "../lib/extension-request.server";
 import { getOrCreateShopSettings } from "../lib/ledger.server";
 import { getLoyaltySnapshot, ratesPayload } from "../lib/loyalty.server";
 
@@ -15,7 +18,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { sessionToken, cors } = await authenticate.public.checkout(
     allowExtensionUserAgent(request),
   );
-  const shop = new URL(sessionToken.dest).hostname;
+  const shop = shopFromSessionTokenDest(sessionToken.dest);
 
   const url = new URL(request.url);
   const customerId = url.searchParams.get("customerId");

@@ -1,16 +1,11 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
-import { allowExtensionUserAgent } from "../lib/extension-request.server";
+import {
+  allowExtensionUserAgent,
+  shopFromSessionTokenDest,
+} from "../lib/extension-request.server";
 import { createReferralCode, ReferralError } from "../lib/ledger.server";
 import { getLoyaltySnapshot } from "../lib/loyalty.server";
-
-function shopFromDest(dest: string) {
-  try {
-    return new URL(dest).hostname;
-  } catch {
-    return dest.replace(/^https?:\/\//, "").split("/")[0];
-  }
-}
 
 function customerIdFromToken(sub: string | undefined) {
   if (!sub) return null;
@@ -30,7 +25,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { sessionToken, cors } = await authenticate.public.customerAccount(
     allowExtensionUserAgent(request),
   );
-  const shop = shopFromDest(String(sessionToken.dest));
+  const shop = shopFromSessionTokenDest(sessionToken.dest);
   const customerId = customerIdFromToken(sessionToken.sub);
 
   if (!customerId) {
@@ -44,7 +39,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { sessionToken, cors } = await authenticate.public.customerAccount(
     allowExtensionUserAgent(request),
   );
-  const shop = shopFromDest(String(sessionToken.dest));
+  const shop = shopFromSessionTokenDest(sessionToken.dest);
   const customerId = customerIdFromToken(sessionToken.sub);
 
   if (!customerId) {

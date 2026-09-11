@@ -20,3 +20,17 @@ export function allowExtensionUserAgent(request: Request) {
   // query string only, and cloning a stream here would need duplex plumbing.
   return new Request(request.url, { method: request.method, headers });
 }
+
+/**
+ * The `dest` claim is not consistently a full URL — Thank you page tokens
+ * carry a bare domain, which makes `new URL(dest)` throw and the endpoint
+ * answer 500. Accept either shape.
+ */
+export function shopFromSessionTokenDest(dest: unknown) {
+  const value = String(dest ?? "");
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return value.replace(/^https?:\/\//, "").split("/")[0];
+  }
+}
