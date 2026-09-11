@@ -2,5 +2,6 @@
   "customer-account.profile.block.render": {},
   "customer-account.profile.addresses.render-after": {},
   "customer-account.profile.announcement.render": {},
-  "customer-account.order-index.announcement.render": {}
+  "customer-account.order-index.announcement.render": {},
+  "customer-account.order-status.block.render": {}
 }

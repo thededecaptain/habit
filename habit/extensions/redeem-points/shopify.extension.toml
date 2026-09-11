@@ -15,17 +15,21 @@ uid = "34d6ac90-46a8-218d-e246-47cc8e5669e2508374e0"
 # and the file that contains your extension’s source code. Learn more:
 # https://shopify.dev/docs/api/checkout-ui-extensions/latest/extension-targets-overview
 
-# Block: merchants place this anywhere in checkout (Plus / extensibility stores).
-[[extensions.targeting]]
-module = "./src/Checkout.jsx"
-target = "purchase.checkout.block.render"
-
-# Static: renders next to the discount code field. Shopify still requires the
-# merchant to activate the extension in the checkout editor before any target
-# renders, so the setup guide and review instructions both call that out.
+# One target per page: the editor lists every target separately, so declaring
+# two for the same page lets a merchant add this extension twice.
+#
+# Checkout page (Shopify Plus only — Shopify restricts checkout-step extensions
+# to Plus). Renders beside the discount code, where redeeming belongs. The
+# merchant still activates it in the checkout editor first.
 [[extensions.targeting]]
 module = "./src/Checkout.jsx"
 target = "purchase.checkout.reductions.render-after"
+
+# Thank you page — available on every plan except Starter, so non-Plus stores
+# still get a Habit surface in the purchase flow.
+[[extensions.targeting]]
+module = "./src/ThankYou.jsx"
+target = "purchase.thank-you.block.render"
 
 [extensions.capabilities]
 # Needed to call our app's backend for the buyer's live points balance.

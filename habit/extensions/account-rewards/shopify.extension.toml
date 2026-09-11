@@ -25,6 +25,12 @@ default_placement = "PROFILE1"
 module = "./src/Announcement.jsx"
 target = "customer-account.order-index.announcement.render"
 
+# Order status: the same rewards card after a purchase. Available on every plan
+# except Starter, unlike the checkout-step target.
+[[extensions.targeting]]
+module = "./src/Profile.jsx"
+target = "customer-account.order-status.block.render"
+
 [extensions.capabilities]
 # Needed to call the app backend for the signed-in customer's live balance.
 network_access = true

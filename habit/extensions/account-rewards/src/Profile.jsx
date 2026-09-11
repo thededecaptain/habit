@@ -120,14 +120,15 @@ function Extension() {
     );
   }
 
-  // The customer is always signed in on this page, so never ask them to sign in —
-  // an empty or failed response means we could not reach the balance.
+  // Profile always has a signed-in customer, but the order status page can be
+  // opened from an email link by a guest — so tell those two cases apart.
   if (error || !data?.loggedIn) {
     return (
       <s-section heading="Your rewards">
         <s-stack direction="block" gap="base">
-          <s-banner tone="warning">
-            {error || "We couldn't load your points balance right now. Refresh to try again."}
+          <s-banner tone={error ? "warning" : "info"}>
+            {error ||
+              "Sign in or create an account with this email to collect points on your orders."}
           </s-banner>
           <s-text color="subdued">
             Habit tracks points you earn on purchases. Redeem them from cart or checkout when signed in.

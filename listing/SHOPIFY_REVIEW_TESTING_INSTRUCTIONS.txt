@@ -9,25 +9,30 @@ CREDENTIALS
 Install Habit → approve OAuth → approve Standard ($49 USD/30 days) with the 30-day free trial. All screens unlock immediately.
 
 2. ACTIVATE THE EXTENSIONS (required first — Shopify requires merchant activation)
-2.1 Checkout: Settings → Checkout → Customize → Apps → add "redeem-points" → Save.
-2.2 Customer accounts: Settings → Customer accounts → Configurations → Customize → Profile → Apps → add "account-rewards" → Save.
+Settings → Checkout → Customize, then add each app block and Save:
+2.1 Checkout page → "redeem-points" (Shopify Plus only; see step 3).
+2.2 Thank you page → "redeem-points" (all plans).
+2.3 Profile page → "account-rewards", and Order status page → "account-rewards".
 
-3. CHECKOUT EXTENSION (requires a Shopify Plus store — Shopify limits checkout-step extensions to Plus. On other plans use the cart path in step 5.)
+3. CHECKOUT EXTENSION (requires a Shopify Plus store — Shopify limits checkout-step extensions to Plus. On other plans use the cart path in step 6.)
 Add a product → go to checkout. "Redeem points" appears in the order summary, under the discount code field.
 • Signed out: program info + referral code field.
 • Signed in: points balance + Apply points.
 
-4. CUSTOMER ACCOUNT EXTENSION
+4. THANK YOU AND ORDER STATUS (all plans)
+After completing an order, the Thank you page shows "You earned N points on this order". The Order status page shows the rewards card.
+
+5. CUSTOMER ACCOUNT EXTENSION
 Sign in on the storefront (6-digit code). Profile shows "Your rewards" with the live balance; Orders shows a rewards banner.
 
-5. ONLINE STORE (no activation needed)
+6. ONLINE STORE (no activation needed)
 Product page shows "Your rewards — Earn N points on this product".
 Habit Home → Setup guide → theme editor → enable the "Redeem points in cart" app embed. The cart redeem UI shows for signed-in customers.
 
-6. EARN
+7. EARN
 Signed in, place a paid test order (Bogus Gateway). Habit → Members: the customer appears with a balance and an EARN row.
 
-7. REDEEM
+8. REDEEM
 With 100+ points, start a second order. Apply points in the cart or at checkout → the discount appears on the total → complete the order. Members shows the lower balance and a REDEEM row.
 
 Defaults: 1 point per $1, 100 points = $1 off (Habit → Settings).
