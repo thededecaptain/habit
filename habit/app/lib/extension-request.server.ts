@@ -28,9 +28,20 @@ export function allowExtensionUserAgent(request: Request) {
  */
 export function shopFromSessionTokenDest(dest: unknown) {
   const value = String(dest ?? "");
+  let shop: string;
   try {
-    return new URL(value).hostname;
+    shop = new URL(value).hostname;
   } catch {
-    return value.replace(/^https?:\/\//, "").split("/")[0];
+    shop = value.replace(/^https?:\/\//, "").split("/")[0];
   }
+
+  // Never fall through with a blank shop: every lookup downstream is keyed by
+  // it, so an empty value would quietly read and write the wrong records.
+  if (!shop.endsWith(".myshopify.com")) {
+    throw new Response(`Could not resolve a shop from the session token`, {
+      status: 400,
+    });
+  }
+
+  return shop;
 }
