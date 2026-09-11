@@ -12,7 +12,7 @@ Install Habit → approve OAuth → approve Standard ($49 USD/30 days) with the 
 2.1 Checkout: Settings → Checkout → Customize → Apps → add "redeem-points" → Save.
 2.2 Customer accounts: Settings → Customer accounts → Configurations → Customize → Profile → Apps → add "account-rewards" → Save.
 
-3. CHECKOUT EXTENSION
+3. CHECKOUT EXTENSION (requires a Shopify Plus store — Shopify limits checkout-step extensions to Plus. On other plans use the cart path in step 5.)
 Add a product → go to checkout. "Redeem points" appears in the order summary, under the discount code field.
 • Signed out: program info + referral code field.
 • Signed in: points balance + Apply points.
