@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
+import { allowExtensionUserAgent } from "../lib/extension-request.server";
 import { getOrCreateShopSettings } from "../lib/ledger.server";
 import { getLoyaltySnapshot, ratesPayload } from "../lib/loyalty.server";
 
@@ -11,7 +12,9 @@ import { getLoyaltySnapshot, ratesPayload } from "../lib/loyalty.server";
  * at checkout time as defense in depth (see extensions/points-redemption).
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { sessionToken, cors } = await authenticate.public.checkout(request);
+  const { request: proxied, originalUserAgent } = allowExtensionUserAgent(request);
+  console.log(`checkout-api/points from user agent: ${originalUserAgent}`);
+  const { sessionToken, cors } = await authenticate.public.checkout(proxied);
   const shop = new URL(sessionToken.dest).hostname;
 
   const url = new URL(request.url);
@@ -34,6 +37,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
  * authenticate here answers the preflight with the required CORS headers.
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
-  await authenticate.public.checkout(request);
+  await authenticate.public.checkout(allowExtensionUserAgent(request).request);
   throw new Response(null, { status: 405, statusText: "Method Not Allowed" });
 };

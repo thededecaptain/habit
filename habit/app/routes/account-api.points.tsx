@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
+import { allowExtensionUserAgent } from "../lib/extension-request.server";
 import { createReferralCode, ReferralError } from "../lib/ledger.server";
 import { getLoyaltySnapshot } from "../lib/loyalty.server";
 
@@ -26,7 +27,9 @@ async function snapshot(shop: string, shopifyCustomerId: string) {
  * (not a query param) so it can't be spoofed.
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { sessionToken, cors } = await authenticate.public.customerAccount(request);
+  const { request: proxied, originalUserAgent } = allowExtensionUserAgent(request);
+  console.log(`account-api/points from user agent: ${originalUserAgent}`);
+  const { sessionToken, cors } = await authenticate.public.customerAccount(proxied);
   const shop = shopFromDest(String(sessionToken.dest));
   const customerId = customerIdFromToken(sessionToken.sub);
 
@@ -38,7 +41,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { sessionToken, cors } = await authenticate.public.customerAccount(request);
+  const { sessionToken, cors } = await authenticate.public.customerAccount(
+    allowExtensionUserAgent(request).request,
+  );
   const shop = shopFromDest(String(sessionToken.dest));
   const customerId = customerIdFromToken(sessionToken.sub);
 
