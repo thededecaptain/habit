@@ -122,8 +122,9 @@
     if (scope && scope.querySelector("[data-habit-referral]")) return;
 
     var t = document.getElementById("habit-referral-template");
-    var widget = t && t.content ? t.content.firstElementChild.cloneNode(true) : null;
-    if (!widget) return;
+    var el = t && t.content && t.content.firstElementChild;
+    if (!el) return;
+    var widget = el.cloneNode(true);
     if (ctas && ctas.parentElement) ctas.parentElement.insertBefore(widget, ctas);
     else parent.insertBefore(widget, btn);
     init(widget, cart);

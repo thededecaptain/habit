@@ -24,7 +24,8 @@
 
   function cloneTemplate() {
     var t = document.getElementById("habit-redeem-template");
-    return t && t.content ? t.content.firstElementChild.cloneNode(true) : null;
+    var el = t && t.content && t.content.firstElementChild;
+    return el ? el.cloneNode(true) : null;
   }
 
   function cartJson() {
