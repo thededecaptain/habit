@@ -11,6 +11,7 @@ const TYPE_LABELS = {
   EARN: "Earned",
   REDEEM: "Redeemed",
   REFUND_REVERSAL: "Refund",
+  REDEMPTION_REFUND: "Points returned",
   REFERRAL_BONUS: "Referral bonus",
   MANUAL_ADJUSTMENT: "Adjustment",
   EXPIRE: "Expired",

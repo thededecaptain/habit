@@ -6,7 +6,6 @@ import {
 } from "../lib/extension-request.server";
 import { getOrCreateShopSettings } from "../lib/ledger.server";
 import { getLoyaltySnapshot, ratesPayload } from "../lib/loyalty.server";
-import { parseRequestUrl } from "../lib/request-url.server";
 
 /**
  * Session-token-authenticated endpoint the redeem-points checkout UI
@@ -21,16 +20,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
   const shop = shopFromSessionTokenDest(sessionToken.dest);
 
-  const url = parseRequestUrl(request);
-  const customerId = url.searchParams.get("customerId");
-  const settings = await getOrCreateShopSettings(shop);
-  const shared = ratesPayload(settings);
-
-  if (!customerId) {
-    return cors(Response.json({ ...shared, pointsBalance: 0 }));
+  // The customer comes from the signed token's `sub` (present when the
+  // buyer is logged in), never from the query string: any buyer at checkout
+  // holds a valid token, so a customerId parameter would let them read
+  // another customer's balance and referral code.
+  const numericId = sessionToken.sub?.replace(/^gid:\/\/shopify\/Customer\//, "") || null;
+  if (!numericId) {
+    const settings = await getOrCreateShopSettings(shop);
+    return cors(Response.json({ ...ratesPayload(settings), pointsBalance: 0 }));
   }
 
-  const numericId = customerId.replace(/^gid:\/\/shopify\/Customer\//, "");
   return cors(Response.json(await getLoyaltySnapshot(shop, numericId)));
 };
 

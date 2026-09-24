@@ -18,6 +18,16 @@ query RunInput {
         amount
       }
     }
+    # The requested points above are shopper-editable, so the discount is
+    # capped at the signed-in buyer's balance, which the app mirrors into
+    # this app-owned customer metafield. No customer = no discount.
+    buyerIdentity {
+      customer {
+        pointsBalance: metafield(namespace: "$app", key: "points_balance") {
+          value
+        }
+      }
+    }
   }
   shop {
     metafield(key: "loyalty_settings") {

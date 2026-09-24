@@ -1,6 +1,7 @@
 import type { Customer, ShopSettings, VipTier } from "@prisma/client";
 import prisma from "../db.server";
 import {
+  compareTiers,
   getOrCreateCustomer,
   getOrCreateShopSettings,
   lastPurchaseActivity,
@@ -53,9 +54,9 @@ export function nextTierProgress(
   lifetimeSpend: number,
   lifetimeOrders: number,
 ) {
-  const next = [...tiers]
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .find((tier) => !current || tier.sortOrder > current.sortOrder);
+  const ranked = [...tiers].sort(compareTiers);
+  const currentIndex = current ? ranked.findIndex((tier) => tier.id === current.id) : -1;
+  const next = ranked[currentIndex + 1];
 
   if (!next) {
     return {

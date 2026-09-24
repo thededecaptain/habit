@@ -90,6 +90,7 @@ const TYPE_LABELS: Record<string, string> = {
   EARN: "Earned",
   REDEEM: "Redeemed",
   REFUND_REVERSAL: "Refund clawback",
+  REDEMPTION_REFUND: "Points returned (refund)",
   REFERRAL_BONUS: "Referral bonus",
   MANUAL_ADJUSTMENT: "Manual adjustment",
   EXPIRE: "Expired",

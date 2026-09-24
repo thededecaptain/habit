@@ -309,7 +309,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     };
   }
 
-  await syncLoyaltySettingsMetafield(admin, session.shop, updated);
+  try {
+    await syncLoyaltySettingsMetafield(admin, session.shop, updated);
+  } catch (error) {
+    // The checkout discount reads these rates from the metafield, so say so
+    // rather than report a clean save.
+    console.error("Failed to sync loyalty settings metafield", error);
+    return {
+      errors: {
+        redemptionRate: "Saved, but checkout didn't get the new rates. Save again to retry.",
+      },
+    };
+  }
   await ensureRedemptionDiscount(admin, session.shop);
 
   return { errors: null, savedAt: Date.now() };

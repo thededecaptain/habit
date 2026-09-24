@@ -77,7 +77,33 @@ export function resolveVipTier(
     return spendOk && ordersOk;
   });
   if (qualifying.length === 0) return null;
-  return qualifying.sort((a, b) => b.sortOrder - a.sortOrder)[0]!;
+  return [...qualifying].sort(compareTiers).at(-1)!;
+}
+
+/**
+ * Tier rank, lowest first: by the merchant's sort order, then — when sort
+ * orders tie (both left at 0) — by threshold, so a higher bar ranks higher.
+ */
+export function compareTiers(a: VipTier, b: VipTier) {
+  return (
+    a.sortOrder - b.sortOrder ||
+    Number(a.minSpend ?? 0) - Number(b.minSpend ?? 0) ||
+    (a.minOrders ?? 0) - (b.minOrders ?? 0) ||
+    Number(a.earnMultiplier) - Number(b.earnMultiplier)
+  );
+}
+
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Locks the member's row for the rest of the transaction and returns it
+ * fresh. Serializes ledger writes per member, so a webhook Shopify delivers
+ * twice at once, or two orders paid together, can't both pass an
+ * "already processed?" check or overwrite each other's lifetime totals.
+ */
+async function lockCustomer(tx: Tx, customerId: string) {
+  await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${customerId} FOR UPDATE`;
+  return tx.customer.findUniqueOrThrow({ where: { id: customerId } });
 }
 
 /**
@@ -94,99 +120,76 @@ export async function awardPointsForOrder(params: {
 }) {
   const { shop, orderId, shopifyCustomerId, customerEmail, subtotalAmount } = params;
 
-  const existing = await prisma.pointTransaction.findFirst({
-    where: { shop, orderId, type: PointTransactionType.EARN },
-  });
+  const alreadyAwarded = () =>
+    prisma.pointTransaction.findFirst({
+      where: { shop, orderId, type: PointTransactionType.EARN },
+    });
+  const existing = await alreadyAwarded();
   if (existing) return existing;
 
-  const [settings, customer, tiers] = await Promise.all([
+  const [settings, member, tiers] = await Promise.all([
     getOrCreateShopSettings(shop),
     getOrCreateCustomer(shop, shopifyCustomerId, customerEmail),
     prisma.vipTier.findMany({ where: { shop } }),
   ]);
 
-  const currentTier = customer.vipTierId
-    ? tiers.find((t) => t.id === customer.vipTierId) ?? null
-    : resolveVipTier(tiers, Number(customer.lifetimeSpend), customer.lifetimeOrders);
-  const multiplier = currentTier ? Number(currentTier.earnMultiplier) : 1;
-  const points = Math.floor(subtotalAmount * Number(settings.pointsPerDollar) * multiplier);
-
-  const lifetimeSpend = Number(customer.lifetimeSpend) + subtotalAmount;
-  const lifetimeOrders = customer.lifetimeOrders + 1;
-  const nextTier = resolveVipTier(tiers, lifetimeSpend, lifetimeOrders);
-  const previousVipTierId = customer.vipTierId;
-  const tierUpgraded = Boolean(nextTier && nextTier.id !== previousVipTierId);
-  const email = customerEmail ?? customer.email;
-  const now = new Date();
-
-  if (points <= 0) {
-    await prisma.$transaction(async (tx) => {
-      await tx.customer.update({
-        where: { id: customer.id },
-        data: {
-          lifetimeSpend,
-          lifetimeOrders,
-          vipTierId: nextTier?.id ?? null,
-          lastActivityAt: now,
-          ...(customerEmail ? { email: customerEmail } : {}),
-        },
-      });
-      if (tierUpgraded && nextTier) {
-        await enqueueLoyaltyEvent(tx, {
-          shop,
-          eventName: EVENT_TIER_UPGRADED,
-          customerEmail: email,
-          shopifyCustomerId: customer.shopifyCustomerId,
-          orderId,
-          uniqueKey: `${EVENT_TIER_UPGRADED}:${customer.id}:${orderId}`,
-          properties: {
-            tierName: nextTier.name,
-            tierId: nextTier.id,
-            lifetimeSpend,
-            lifetimeOrders,
-            orderId,
-          },
-        });
-      }
-    });
-    return null;
-  }
-
-  const newBalance = customer.pointsBalance + points;
-
   return prisma.$transaction(async (tx) => {
+    const customer = await lockCustomer(tx, member.id);
+    const duplicate = await tx.pointTransaction.findFirst({
+      where: { shop, orderId, type: PointTransactionType.EARN },
+    });
+    if (duplicate) return duplicate;
+
+    const currentTier = customer.vipTierId
+      ? tiers.find((t) => t.id === customer.vipTierId) ?? null
+      : resolveVipTier(tiers, Number(customer.lifetimeSpend), customer.lifetimeOrders);
+    const multiplier = currentTier ? Number(currentTier.earnMultiplier) : 1;
+    const points = Math.floor(subtotalAmount * Number(settings.pointsPerDollar) * multiplier);
+
+    const lifetimeSpend = Number(customer.lifetimeSpend) + subtotalAmount;
+    const lifetimeOrders = customer.lifetimeOrders + 1;
+    const nextTier = resolveVipTier(tiers, lifetimeSpend, lifetimeOrders);
+    const tierUpgraded = Boolean(nextTier && nextTier.id !== customer.vipTierId);
+    const email = customerEmail ?? customer.email;
+
+    await tx.customer.update({
+      where: { id: customer.id },
+      data: {
+        ...(points > 0 ? { pointsBalance: { increment: points } } : {}),
+        lifetimeSpend,
+        lifetimeOrders,
+        vipTierId: nextTier?.id ?? null,
+        lastActivityAt: new Date(),
+        ...(customerEmail ? { email: customerEmail } : {}),
+      },
+    });
+
+    // Recorded even at 0 points: this row is what makes a redelivered
+    // webhook a no-op, including for the order's lifetime totals.
     const transaction = await tx.pointTransaction.create({
       data: {
         shop,
         customerId: customer.id,
         type: PointTransactionType.EARN,
-        points,
+        points: Math.max(points, 0),
         orderId,
         description: `Earned on order (subtotal $${subtotalAmount.toFixed(2)}${
           multiplier !== 1 ? `, ${multiplier}x ${currentTier?.name} tier` : ""
         })`,
       },
     });
-    await tx.customer.update({
-      where: { id: customer.id },
-      data: {
-        pointsBalance: { increment: points },
-        lifetimeSpend,
-        lifetimeOrders,
-        vipTierId: nextTier?.id ?? null,
-        lastActivityAt: now,
-        ...(customerEmail ? { email: customerEmail } : {}),
-      },
-    });
-    await enqueueLoyaltyEvent(tx, {
-      shop,
-      eventName: EVENT_POINTS_EARNED,
-      customerEmail: email,
-      shopifyCustomerId: customer.shopifyCustomerId,
-      orderId,
-      uniqueKey: `${EVENT_POINTS_EARNED}:${transaction.id}`,
-      properties: { points, orderId, pointsBalance: newBalance },
-    });
+
+    if (points > 0) {
+      await enqueueLoyaltyEvent(tx, {
+        shop,
+        eventName: EVENT_POINTS_EARNED,
+        customerEmail: email,
+        shopifyCustomerId: customer.shopifyCustomerId,
+        orderId,
+        uniqueKey: `${EVENT_POINTS_EARNED}:${transaction.id}`,
+        properties: { points, orderId, pointsBalance: customer.pointsBalance + points },
+      });
+    }
     if (tierUpgraded && nextTier) {
       await enqueueLoyaltyEvent(tx, {
         shop,
@@ -194,7 +197,7 @@ export async function awardPointsForOrder(params: {
         customerEmail: email,
         shopifyCustomerId: customer.shopifyCustomerId,
         orderId,
-        uniqueKey: `${EVENT_TIER_UPGRADED}:${transaction.id}`,
+        uniqueKey: `${EVENT_TIER_UPGRADED}:${customer.id}:${orderId}`,
         properties: {
           tierName: nextTier.name,
           tierId: nextTier.id,
@@ -209,9 +212,15 @@ export async function awardPointsForOrder(params: {
 }
 
 /**
- * Reverses points earned on a refunded order. Reverses proportionally to the
- * refunded amount vs. the original order subtotal when possible; falls back
- * to reversing the full EARN amount for that order.
+ * Handles a refund on an order, in proportion to how much of the order's
+ * subtotal has been refunded so far (refundedAmount is cumulative):
+ *  - claws back the points the order earned;
+ *  - gives back the points spent on the order's discount;
+ *  - on a full refund, reverses the referral bonuses the order triggered
+ *    (a friend ordering, collecting the bonus, then refunding).
+ * Each part is tracked by what was already reversed for the order, so
+ * several partial refunds add up correctly and a redelivered webhook is a
+ * no-op.
  */
 export async function reverseForRefund(params: {
   shop: string;
@@ -220,47 +229,104 @@ export async function reverseForRefund(params: {
   orderSubtotal: number;
 }) {
   const { shop, orderId, refundedAmount, orderSubtotal } = params;
-
-  const earnTx = await prisma.pointTransaction.findFirst({
-    where: { shop, orderId, type: PointTransactionType.EARN },
-  });
-  if (!earnTx) return null;
-
-  const alreadyReversed = await prisma.pointTransaction.aggregate({
-    where: { shop, orderId, type: PointTransactionType.REFUND_REVERSAL },
-    _sum: { points: true },
-  });
-  const alreadyReversedPoints = Math.abs(alreadyReversed._sum.points ?? 0);
-
   const proportion = orderSubtotal > 0 ? Math.min(refundedAmount / orderSubtotal, 1) : 1;
-  const targetReversal = Math.floor(earnTx.points * proportion);
-  const pointsToReverse = Math.min(
-    targetReversal - alreadyReversedPoints,
-    earnTx.points - alreadyReversedPoints,
-  );
 
-  if (pointsToReverse <= 0) return null;
+  const rows = await prisma.pointTransaction.findMany({ where: { shop, orderId } });
+  if (rows.length === 0) return [];
+  const customerIds = [...new Set(rows.map((r) => r.customerId))];
 
-  const [transaction] = await prisma.$transaction([
-    prisma.pointTransaction.create({
-      data: {
-        shop,
-        customerId: earnTx.customerId,
-        type: PointTransactionType.REFUND_REVERSAL,
-        points: -pointsToReverse,
-        orderId,
-        description: `Refund clawback ($${refundedAmount.toFixed(2)} refunded)`,
-      },
-    }),
-    prisma.customer.update({
-      where: { id: earnTx.customerId },
-      // Balance can go negative if the customer already redeemed the points —
-      // that's intentional; it nets out against future earning.
-      data: { pointsBalance: { decrement: pointsToReverse } },
-    }),
-  ]);
+  return prisma.$transaction(async (tx) => {
+    for (const id of customerIds) await lockCustomer(tx, id);
+    const current = await tx.pointTransaction.findMany({ where: { shop, orderId } });
+    const sum = (type: PointTransactionType, customerId?: string) =>
+      current
+        .filter((r) => r.type === type && (!customerId || r.customerId === customerId))
+        .reduce((total, r) => total + r.points, 0);
 
-  return transaction;
+    const created = [];
+    const apply = async (customerId: string, points: number, type: PointTransactionType, description: string) => {
+      if (points === 0) return;
+      created.push(
+        await tx.pointTransaction.create({
+          data: { shop, customerId, type, points, orderId, description },
+        }),
+      );
+      // Balance can go negative if the customer already spent the points
+      // being clawed back — intentional; it nets out against future earning.
+      await tx.customer.update({
+        where: { id: customerId },
+        data: { pointsBalance: { increment: points } },
+      });
+    };
+
+    const refundNote = `$${refundedAmount.toFixed(2)} refunded so far`;
+
+    const earn = current.find((r) => r.type === PointTransactionType.EARN);
+    if (earn) {
+      // Referral-bonus reversals are REFUND_REVERSAL rows too; skip them.
+      const reversed = Math.abs(
+        current
+          .filter(
+            (r) =>
+              r.type === PointTransactionType.REFUND_REVERSAL &&
+              r.customerId === earn.customerId &&
+              r.referralCodeId == null,
+          )
+          .reduce((total, r) => total + r.points, 0),
+      );
+      const target = Math.floor(earn.points * proportion);
+      await apply(
+        earn.customerId,
+        -Math.max(0, Math.min(target, earn.points) - reversed),
+        PointTransactionType.REFUND_REVERSAL,
+        `Refund clawback (${refundNote})`,
+      );
+    }
+
+    const redeem = current.find((r) => r.type === PointTransactionType.REDEEM);
+    if (redeem) {
+      const spent = Math.abs(redeem.points);
+      const returned = sum(PointTransactionType.REDEMPTION_REFUND, redeem.customerId);
+      const target = Math.floor(spent * proportion);
+      await apply(
+        redeem.customerId,
+        Math.max(0, Math.min(target, spent) - returned),
+        PointTransactionType.REDEMPTION_REFUND,
+        `Points returned (${refundNote})`,
+      );
+    }
+
+    if (proportion >= 1) {
+      for (const bonus of current.filter((r) => r.type === PointTransactionType.REFERRAL_BONUS)) {
+        const alreadyReversed = current.some(
+          (r) =>
+            r.type === PointTransactionType.REFUND_REVERSAL &&
+            r.customerId === bonus.customerId &&
+            r.referralCodeId === bonus.referralCodeId,
+        );
+        if (alreadyReversed || bonus.points <= 0) continue;
+        created.push(
+          await tx.pointTransaction.create({
+            data: {
+              shop,
+              customerId: bonus.customerId,
+              type: PointTransactionType.REFUND_REVERSAL,
+              points: -bonus.points,
+              orderId,
+              referralCodeId: bonus.referralCodeId,
+              description: "Referral bonus reversed (referred order refunded)",
+            },
+          }),
+        );
+        await tx.customer.update({
+          where: { id: bonus.customerId },
+          data: { pointsBalance: { decrement: bonus.points } },
+        });
+      }
+    }
+
+    return created;
+  });
 }
 
 export class RedemptionError extends Error {}
@@ -293,12 +359,11 @@ export async function previewRedemption(params: {
 
 /**
  * Finalizes a redemption once an order has actually been paid (called from
- * the orders/paid webhook, reading the points amount the checkout extension
- * wrote to a cart attribute — the same amount the Function used to compute
- * the discount). Idempotent per orderId. Clamps to the customer's current
- * balance rather than throwing, since the discount has already been granted
- * to a completed, paid order by this point; an overdraft here signals a
- * possible race condition or tampered cart attribute worth flagging.
+ * the orders/paid webhook with the points the order's loyalty discount was
+ * worth). Idempotent per orderId. Clamps to the customer's current balance
+ * rather than throwing, since the discount has already been granted to a
+ * completed, paid order by this point; an overdraft here signals a race
+ * (two carts spending the same points) worth flagging.
  */
 export async function finalizeRedemptionForOrder(params: {
   shop: string;
@@ -309,23 +374,24 @@ export async function finalizeRedemptionForOrder(params: {
   const { shop, orderId, shopifyCustomerId, points } = params;
   if (points <= 0) return null;
 
-  const existing = await prisma.pointTransaction.findFirst({
-    where: { shop, orderId, type: PointTransactionType.REDEEM },
-  });
-  if (existing) return existing;
-
-  const customer = await getOrCreateCustomer(shop, shopifyCustomerId);
-  const pointsToDeduct = Math.min(points, Math.max(customer.pointsBalance, 0));
-  if (pointsToDeduct < points) {
-    console.warn(
-      `Redemption overdraft on order ${orderId} for shop ${shop}: requested ${points}, balance ${customer.pointsBalance}`,
-    );
-  }
-  if (pointsToDeduct <= 0) return null;
-
-  const newBalance = customer.pointsBalance - pointsToDeduct;
+  const member = await getOrCreateCustomer(shop, shopifyCustomerId);
 
   return prisma.$transaction(async (tx) => {
+    const customer = await lockCustomer(tx, member.id);
+    const existing = await tx.pointTransaction.findFirst({
+      where: { shop, orderId, type: PointTransactionType.REDEEM },
+    });
+    if (existing) return existing;
+
+    const pointsToDeduct = Math.min(points, Math.max(customer.pointsBalance, 0));
+    if (pointsToDeduct < points) {
+      console.warn(
+        `Redemption overdraft on order ${orderId} for shop ${shop}: requested ${points}, balance ${customer.pointsBalance}`,
+      );
+    }
+    if (pointsToDeduct <= 0) return null;
+
+    const newBalance = customer.pointsBalance - pointsToDeduct;
     const transaction = await tx.pointTransaction.create({
       data: {
         shop,
@@ -487,6 +553,9 @@ export async function checkReferralCode(params: {
     if (referee?.redeemedReferralCode) {
       throw new ReferralError("A referral code has already been used on this account.");
     }
+    if (referee && referee.lifetimeOrders > 0) {
+      throw new ReferralError("Referral codes are for a customer's first order.");
+    }
   }
   const settings = await getOrCreateShopSettings(shop);
   return { code: referralCode.code, refereeBonusPoints: settings.refereeBonusPoints };
@@ -524,6 +593,10 @@ export async function redeemReferralCode(params: {
   if (referee.id === referralCode.ownerId) {
     throw new ReferralError("You can't refer yourself.");
   }
+  // Runs after this order was counted, so a first order shows as 1.
+  if (referee.lifetimeOrders > 1) {
+    throw new ReferralError("Referral codes are for a customer's first order.");
+  }
   const alreadyRedeemed = await prisma.referralCode.findFirst({
     where: { redeemedByCustomerId: referee.id },
   });
@@ -536,14 +609,19 @@ export async function redeemReferralCode(params: {
   });
 
   await prisma.$transaction(async (tx) => {
-    await tx.referralCode.update({
-      where: { id: referralCode.id },
+    // Conditional on still being ACTIVE: a webhook delivered twice at once
+    // must not pay the bonuses twice.
+    const claimed = await tx.referralCode.updateMany({
+      where: { id: referralCode.id, status: ReferralCodeStatus.ACTIVE },
       data: {
         status: ReferralCodeStatus.REDEEMED,
         redeemedByCustomerId: referee.id,
         redeemedAt: new Date(),
       },
     });
+    if (claimed.count !== 1) {
+      throw new ReferralError("This referral code is no longer active.");
+    }
     const referrerTx = await tx.pointTransaction.create({
       data: {
         shop,

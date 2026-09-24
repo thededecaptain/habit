@@ -7,8 +7,11 @@ import { PointTransactionType } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import { parseRequestUrl } from "../lib/request-url.server";
 import db from "../db.server";
+import { syncPointsBalances } from "../lib/balance-sync.server";
 
 const ADJUST_MODAL_ID = "adjust-points-modal";
+// Guards against a typo'd extra zero and the database's Int range.
+const MAX_ADJUSTMENT = 1_000_000;
 
 function membersHref(page: number, q: string) {
   const params = new URLSearchParams();
@@ -64,14 +67,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
   const customerId = String(formData.get("customerId"));
   const amount = Number(formData.get("amount"));
   const reason = String(formData.get("reason") ?? "").trim();
 
-  if (!customerId || !Number.isFinite(amount) || amount === 0) {
-    return { errors: { amount: "Enter a non-zero number of points." } };
+  if (!customerId || !Number.isInteger(amount) || amount === 0) {
+    return { errors: { amount: "Enter a whole, non-zero number of points." } };
+  }
+  if (Math.abs(amount) > MAX_ADJUSTMENT) {
+    return { errors: { amount: `Adjust by at most ${MAX_ADJUSTMENT.toLocaleString()} points at a time.` } };
   }
   if (!reason) {
     return { errors: { reason: "A reason is required for manual adjustments." } };
@@ -97,6 +103,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       data: { pointsBalance: { increment: amount } },
     }),
   ]);
+  await syncPointsBalances(session.shop, { admin, customerIds: [customer.id] });
 
   return { ok: true };
 };

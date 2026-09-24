@@ -130,6 +130,10 @@ model Customer {
   lifetimeSpend     Decimal  @default(0) @db.Decimal(12, 2)
   lifetimeOrders    Int      @default(0)
   pointsBalance     Int      @default(0)
+  // Balance last written to the customer's $app:points_balance metafield,
+  // which the checkout discount Function caps redemptions against. Null or
+  // different from pointsBalance = needs syncing (see balance-sync.server).
+  syncedPointsBalance Int?
   vipTierId         String?
   vipTier           VipTier? @relation(fields: [vipTierId], references: [id])
   // Last EARN or REDEEM. Referral bonuses and manual adjustments do not count.
@@ -155,6 +159,8 @@ enum PointTransactionType {
   REFERRAL_BONUS
   MANUAL_ADJUSTMENT
   EXPIRE
+  // Points spent on an order given back when that order is refunded.
+  REDEMPTION_REFUND
 }
 
 model PointTransaction {

@@ -5,16 +5,26 @@
     "input": {
       "cart": {
         "pointsMetafield": null,
-        "pointsAttribute": null,
+        "pointsAttribute": {
+          "value": "50"
+        },
         "cost": {
           "subtotalAmount": {
             "amount": "100.00"
           }
         },
-        "buyerIdentity": null
+        "buyerIdentity": {
+          "customer": {
+            "pointsBalance": {
+              "value": "1000"
+            }
+          }
+        }
       },
       "shop": {
-        "metafield": null
+        "metafield": {
+          "value": "{\"redemptionRate\":100,\"maxRedemptionPercent\":50,\"minRedeemablePoints\":100}"
+        }
       }
     },
     "output": {

@@ -15,6 +15,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const shopifyCustomerId = String(customer?.id ?? "");
   if (!shopifyCustomerId) return new Response();
 
+  // Queued loyalty notifications carry the customer's email.
+  await db.notificationOutbox.deleteMany({ where: { shop, shopifyCustomerId } });
+
   const record = await db.customer.findUnique({
     where: { shop_shopifyCustomerId: { shop, shopifyCustomerId } },
   });

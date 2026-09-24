@@ -12,6 +12,13 @@
           "subtotalAmount": {
             "amount": "100.00"
           }
+        },
+        "buyerIdentity": {
+          "customer": {
+            "pointsBalance": {
+              "value": "1000"
+            }
+          }
         }
       },
       "shop": {

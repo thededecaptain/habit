@@ -11,6 +11,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   // still exist after uninstall while refresh is already revoked — do not gate
   // cleanup on authenticate.webhook()'s session object.
   await db.session.deleteMany({ where: { shop } });
+  // App-owned metafields can go with the app. If the shop reinstalls before
+  // shop/redact purges its data, re-sync every balance to checkout.
+  await db.customer.updateMany({ where: { shop }, data: { syncedPointsBalance: null } });
 
   return new Response();
 };

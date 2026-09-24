@@ -41,34 +41,55 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const name = String(formData.get("name") ?? "").trim();
-  const minSpendRaw = formData.get("minSpend");
-  const minOrdersRaw = formData.get("minOrders");
+  const minSpendRaw = String(formData.get("minSpend") ?? "").trim();
+  const minOrdersRaw = String(formData.get("minOrders") ?? "").trim();
   const earnMultiplier = Number(formData.get("earnMultiplier"));
-  const sortOrder = Number(formData.get("sortOrder") ?? 0);
+  const sortOrderRaw = String(formData.get("sortOrder") ?? "").trim();
+  const minSpend = minSpendRaw ? Number(minSpendRaw) : null;
+  const minOrders = minOrdersRaw ? Number(minOrdersRaw) : null;
+  const sortOrder = sortOrderRaw ? Number(sortOrderRaw) : 0;
 
+  // Bounds match the database columns, so bad input gets a field error
+  // instead of a failed write.
   const errors: Record<string, string> = {};
   if (!name) errors.name = "Tier name is required.";
-  if (!minSpendRaw && !minOrdersRaw) {
+  else if (name.length > 50) errors.name = "Keep the tier name to 50 characters or fewer.";
+  if (minSpend == null && minOrders == null) {
     errors.minSpend = "Set a minimum spend or minimum order count (or both).";
+  } else if (minSpend != null && (!Number.isFinite(minSpend) || minSpend < 0 || minSpend > 99_999_999)) {
+    errors.minSpend = "Minimum spend must be a positive amount.";
   }
-  if (!earnMultiplier || earnMultiplier <= 0) {
-    errors.earnMultiplier = "Earn multiplier must be greater than 0.";
+  if (minOrders != null && (!Number.isInteger(minOrders) || minOrders < 0 || minOrders > 1_000_000)) {
+    errors.minOrders = "Minimum orders must be a whole number.";
+  }
+  if (!Number.isFinite(earnMultiplier) || earnMultiplier <= 0 || earnMultiplier > 10) {
+    errors.earnMultiplier = "Earn multiplier must be more than 0 and at most 10.";
+  }
+  if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 1000) {
+    errors.sortOrder = "Sort order must be a whole number from 0 to 1000.";
   }
   if (Object.keys(errors).length > 0) {
     return { errors };
   }
 
+  const id = String(formData.get("id") ?? "");
+  const duplicate = await db.vipTier.findFirst({
+    where: { shop, name: { equals: name, mode: "insensitive" }, ...(intent === "update" ? { id: { not: id } } : {}) },
+  });
+  if (duplicate) {
+    return { errors: { name: `There's already a tier called ${duplicate.name}.` } };
+  }
+
   const data = {
     shop,
     name,
-    minSpend: minSpendRaw ? Number(minSpendRaw) : null,
-    minOrders: minOrdersRaw ? Number(minOrdersRaw) : null,
-    earnMultiplier,
+    minSpend,
+    minOrders,
+    earnMultiplier: Math.round(earnMultiplier * 100) / 100,
     sortOrder,
   };
 
   if (intent === "update") {
-    const id = String(formData.get("id"));
     await db.vipTier.updateMany({ where: { id, shop }, data });
   } else {
     await db.vipTier.create({ data });
@@ -254,6 +275,7 @@ export default function VipTiers() {
             key={`minOrders-${modalSession}`}
             label="Minimum lifetime orders"
             defaultValue={editing.minOrders != null ? String(editing.minOrders) : ""}
+            error={errors.minOrders}
             min={0}
             step={1}
             onInput={(e: any) => {
@@ -280,6 +302,7 @@ export default function VipTiers() {
             key={`sortOrder-${modalSession}`}
             label="Sort order"
             defaultValue={String(editing.sortOrder)}
+            error={errors.sortOrder}
             min={0}
             step={1}
             details="Lower numbers are earlier tiers. Next-tier copy uses this order."

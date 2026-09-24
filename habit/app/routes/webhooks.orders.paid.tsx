@@ -3,9 +3,21 @@ import { authenticate } from "../shopify.server";
 import {
   awardPointsForOrder,
   finalizeRedemptionForOrder,
+  getOrCreateShopSettings,
   redeemReferralCode,
   ReferralError,
 } from "../lib/ledger.server";
+import { syncPointsBalances } from "../lib/balance-sync.server";
+import {
+  loyaltyDiscountAmount,
+  pointsForDiscount,
+  type OrderDiscountPayload,
+} from "../lib/order-discount.server";
+import {
+  loadRedemptionDiscountTitle,
+  REDEMPTION_DISCOUNT_MESSAGE,
+  REDEMPTION_DISCOUNT_TITLE,
+} from "../lib/discount.server";
 
 /**
  * Awards ledger points when an order is paid. Also finalizes any point
@@ -78,12 +90,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (pointsRedeemed > 0) {
-    await finalizeRedemptionForOrder({
+    // Deduct what the discount was actually worth, not what the cart asked
+    // for: the Function caps the request at the balance and at the max
+    // percent of the subtotal, and the cart may have shrunk since.
+    const points = await pointsSpentOnOrder({
+      payload,
+      requested: pointsRedeemed,
       shop,
-      orderId,
-      shopifyCustomerId: String(customer.id),
-      points: pointsRedeemed,
+      admin,
     });
+    if (points > 0) {
+      await finalizeRedemptionForOrder({
+        shop,
+        orderId,
+        shopifyCustomerId: String(customer.id),
+        points,
+      });
+    }
   }
 
   if (referralCode) {
@@ -102,5 +125,34 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
+  // Push the new balances (this customer, and a referrer) to the metafield
+  // the checkout Function caps redemptions against. The cron retries misses.
+  await syncPointsBalances(shop, { admin, limit: 50 });
+
   return new Response();
 };
+
+/**
+ * Points the order's loyalty discount was worth. No loyalty discount on the
+ * order means none was granted — e.g. a guest or a zero balance — so
+ * nothing is deducted.
+ */
+async function pointsSpentOnOrder(params: {
+  payload: Record<string, unknown>;
+  requested: number;
+  shop: string;
+  admin: { graphql: (query: string, options?: { variables?: Record<string, unknown> }) => Promise<Response> };
+}) {
+  const { requested, shop, admin } = params;
+  const settings = await getOrCreateShopSettings(shop);
+  const titles = [REDEMPTION_DISCOUNT_TITLE, REDEMPTION_DISCOUNT_MESSAGE];
+  const liveTitle = await loadRedemptionDiscountTitle(admin, settings.discountAutomaticId);
+  if (liveTitle) titles.push(liveTitle);
+
+  const amount = loyaltyDiscountAmount(params.payload as OrderDiscountPayload, titles);
+  if (amount == null) {
+    console.warn(`Order discount check: ${requested} points requested but no loyalty discount on the order`);
+    return 0;
+  }
+  return pointsForDiscount(amount, Number(settings.redemptionRate), requested);
+}

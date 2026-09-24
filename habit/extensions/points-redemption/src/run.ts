@@ -9,6 +9,7 @@ const EMPTY_DISCOUNT: FunctionRunResult = {
 type LoyaltySettings = {
   redemptionRate: number;
   maxRedemptionPercent: number;
+  minRedeemablePoints?: number;
 };
 
 /**
@@ -24,17 +25,27 @@ type LoyaltySettings = {
  * most recent edit right up to payment. Either way, this Function
  * re-derives the discount amount from shop-level settings (synced to a
  * shop metafield whenever a merchant saves their loyalty settings) and
- * independently caps it at `maxRedemptionPercent` of the order subtotal —
- * this is the enforcement point that can't be bypassed by tampering with
- * the cart attribute/metafield client-side.
+ * independently caps it at `maxRedemptionPercent` of the order subtotal.
+ *
+ * The requested amount is shopper-editable (anyone can set a cart
+ * attribute), so this is the enforcement point: the discount only applies
+ * to a signed-in buyer, and never for more points than the balance the app
+ * mirrors into their `$app:points_balance` customer metafield.
  */
 export function run(input: RunInput): FunctionRunResult {
   const fromMetafield = Number(input.cart.pointsMetafield?.value ?? 0);
   const fromAttribute = Number(input.cart.pointsAttribute?.value ?? 0);
-  const pointsToRedeem = fromMetafield > 0 ? fromMetafield : fromAttribute;
-  if (!pointsToRedeem || pointsToRedeem <= 0) {
+  const requested = fromMetafield > 0 ? fromMetafield : fromAttribute;
+  if (!Number.isFinite(requested) || requested <= 0) {
     return EMPTY_DISCOUNT;
   }
+
+  const customer = input.cart.buyerIdentity?.customer;
+  if (!customer) {
+    return EMPTY_DISCOUNT;
+  }
+  const balance = Math.max(0, Math.floor(Number(customer.pointsBalance?.value ?? 0)) || 0);
+  const pointsToRedeem = Math.min(Math.floor(requested), balance);
 
   let settings: LoyaltySettings;
   try {
@@ -46,6 +57,10 @@ export function run(input: RunInput): FunctionRunResult {
   const redemptionRate = Number(settings.redemptionRate);
   const maxRedemptionPercent = Number(settings.maxRedemptionPercent);
   if (!redemptionRate || redemptionRate <= 0) {
+    return EMPTY_DISCOUNT;
+  }
+  const minRedeemablePoints = Number(settings.minRedeemablePoints ?? 0) || 0;
+  if (pointsToRedeem <= 0 || pointsToRedeem < minRedeemablePoints) {
     return EMPTY_DISCOUNT;
   }
 

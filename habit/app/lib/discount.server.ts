@@ -1,8 +1,36 @@
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
 import type { ShopSettings } from "@prisma/client";
 import db from "../db.server";
+import { withTransientRetry } from "./transient-retry.server";
 
 const REDEMPTION_FUNCTION_HANDLE = "points-redemption";
+export const REDEMPTION_DISCOUNT_TITLE = "Loyalty points redemption";
+// Must match the message returned by extensions/points-redemption/src/run.ts.
+export const REDEMPTION_DISCOUNT_MESSAGE = "Loyalty points redeemed";
+
+/** Current title of the shop's redemption discount (a merchant can rename it). */
+export async function loadRedemptionDiscountTitle(
+  admin: { graphql: (query: string, options?: { variables?: Record<string, unknown> }) => Promise<Response> },
+  discountId: string | null,
+) {
+  if (!discountId) return null;
+  try {
+    const response = await admin.graphql(
+      `#graphql
+      query RedemptionDiscountTitle($id: ID!) {
+        discountNode(id: $id) {
+          discount { ... on DiscountAutomaticApp { title } }
+        }
+      }`,
+      { variables: { id: discountId } },
+    );
+    const json = await response.json();
+    return (json?.data?.discountNode?.discount?.title as string | undefined) ?? null;
+  } catch (error) {
+    console.warn("Could not load redemption discount title", error);
+    return null;
+  }
+}
 
 /**
  * Pushes earn/redemption rates into a shop metafield so the
@@ -12,16 +40,21 @@ const REDEMPTION_FUNCTION_HANDLE = "points-redemption";
 export async function syncLoyaltySettingsMetafield(
   admin: AdminApiContext,
   shop: string,
-  settings: Pick<ShopSettings, "pointsPerDollar" | "redemptionRate" | "maxRedemptionPercent">,
+  settings: Pick<
+    ShopSettings,
+    "pointsPerDollar" | "redemptionRate" | "maxRedemptionPercent" | "minRedeemablePoints"
+  >,
 ) {
-  const shopResponse = await admin.graphql(`#graphql
-    query ShopId { shop { id } }
-  `);
-  const shopJson = await shopResponse.json();
+  const shopJson = await withTransientRetry(async () => {
+    const shopResponse = await admin.graphql(`#graphql
+      query ShopId { shop { id } }
+    `);
+    return shopResponse.json();
+  });
   const shopGid = shopJson?.data?.shop?.id;
   if (!shopGid) return;
 
-  await admin.graphql(
+  await withTransientRetry(() => admin.graphql(
     `#graphql
     mutation SetLoyaltySettings($metafields: [MetafieldsSetInput!]!) {
       metafieldsSet(metafields: $metafields) {
@@ -39,12 +72,13 @@ export async function syncLoyaltySettingsMetafield(
               pointsPerDollar: Number(settings.pointsPerDollar),
               redemptionRate: Number(settings.redemptionRate),
               maxRedemptionPercent: Number(settings.maxRedemptionPercent),
+              minRedeemablePoints: settings.minRedeemablePoints,
             }),
           },
         ],
       },
     },
-  );
+  ));
 
   console.log(`Synced loyalty_settings metafield for ${shop}`);
 }
@@ -70,7 +104,7 @@ export async function ensureRedemptionDiscount(admin: AdminApiContext, shop: str
       {
         variables: {
           discount: {
-            title: "Loyalty points redemption",
+            title: REDEMPTION_DISCOUNT_TITLE,
             functionHandle: REDEMPTION_FUNCTION_HANDLE,
             discountClasses: ["ORDER"],
             startsAt: new Date().toISOString(),

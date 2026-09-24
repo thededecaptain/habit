@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { sweepPointsBalances } from "./balance-sync.server";
 import {
   DAY_MS,
   expireInactiveBalances,
@@ -10,8 +11,12 @@ import {
   processOutbox,
 } from "./notifications.server";
 
+// Runs every 5 minutes: delivers queued loyalty events and re-syncs any
+// points balance whose checkout metafield is out of date.
 export async function runOutboxJob() {
-  return processOutbox();
+  const outbox = await processOutbox();
+  const balancesSynced = await sweepPointsBalances();
+  return { ...outbox, balancesSynced };
 }
 
 const SOON_BATCH = 200;

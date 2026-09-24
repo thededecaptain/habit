@@ -4,10 +4,10 @@
     "target": "purchase.order-discount.run",
     "input": {
       "cart": {
-        "pointsMetafield": {
-          "value": "500"
+        "pointsMetafield": null,
+        "pointsAttribute": {
+          "value": "5000"
         },
-        "pointsAttribute": null,
         "cost": {
           "subtotalAmount": {
             "amount": "100.00"
@@ -16,7 +16,7 @@
         "buyerIdentity": {
           "customer": {
             "pointsBalance": {
-              "value": "1000"
+              "value": "300"
             }
           }
         }
@@ -41,7 +41,7 @@
           ],
           "value": {
             "fixedAmount": {
-              "amount": "5.00"
+              "amount": "3.00"
             }
           }
         }

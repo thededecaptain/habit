@@ -47,7 +47,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db.vipTier.count({ where: { shop } }),
     db.pointTransaction.groupBy({
       by: ["type"],
-      where: { shop, type: { in: ["EARN", "REDEEM"] } },
+      where: { shop, type: { in: ["EARN", "REDEEM", "REDEMPTION_REFUND"] } },
       _sum: { points: true },
     }),
     db.customer.aggregate({ where: { shop }, _sum: { pointsBalance: true } }),
@@ -59,7 +59,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     pointTotals.map((row) => [row.type, row._sum.points ?? 0]),
   );
   const pointsIssued = pointsByType.EARN ?? 0;
-  const pointsRedeemed = Math.abs(pointsByType.REDEEM ?? 0);
+  // Points handed back when a redeemed order was refunded don't count as spent.
+  const pointsRedeemed = Math.max(
+    0,
+    Math.abs(pointsByType.REDEEM ?? 0) - (pointsByType.REDEMPTION_REFUND ?? 0),
+  );
   const memberGmv = Number(gmv._sum.lifetimeSpend ?? 0);
   const redeemedDollars = pointsRedeemed / (Number(settings.redemptionRate) || 1);
 
