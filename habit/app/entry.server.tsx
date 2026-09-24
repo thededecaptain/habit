@@ -9,6 +9,11 @@ import { addDocumentResponseHeaders } from "./shopify.server";
 
 export const streamTimeout = 5000;
 
+/** Original loader/action errors, before React Router sanitizes them for the client. */
+export function handleError(error: unknown) {
+  captureServerException(error, { phase: "handleError" });
+}
+
 export default async function handleRequest(
   request: Request,
   responseStatusCode: number,
@@ -47,7 +52,14 @@ export default async function handleRequest(
         },
         onError(error) {
           responseStatusCode = 500;
-          captureServerException(error, { phase: "onError" });
+          // Production sanitizes loader failures to "Unexpected Server Error".
+          // handleError already captured the original exception.
+          if (
+            !(error instanceof Error) ||
+            error.message !== "Unexpected Server Error"
+          ) {
+            captureServerException(error, { phase: "onError" });
+          }
         },
       }
     );

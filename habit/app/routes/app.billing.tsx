@@ -13,15 +13,22 @@ import {
   shouldUseHostedPlanPage,
 } from "../lib/billing.server";
 import { docsHref } from "../lib/brand";
+import { parseRequestUrl } from "../lib/request-url.server";
 import { SupportFooter } from "../components/support-footer";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, billing, redirect, session } = await authenticate.admin(request);
   await captureWelcomePlanHandle(request, session.shop);
-  const shopContext = await loadShopBillingContext(admin, session.shop);
-  const access = await findPaidAccess(billing, shopContext, admin);
+  let access: Awaited<ReturnType<typeof findPaidAccess>> = null;
+  try {
+    const shopContext = await loadShopBillingContext(admin, session.shop);
+    access = await findPaidAccess(billing, shopContext, admin);
+  } catch (error) {
+    // Shopify unreachable after retries: show the plan page instead of a 500.
+    console.warn(`Could not load billing status for ${session.shop}`, error);
+  }
 
-  const url = new URL(request.url);
+  const url = parseRequestUrl(request);
   const cancelled = url.searchParams.get("cancelled") === "1";
 
   if (access && !cancelled) {

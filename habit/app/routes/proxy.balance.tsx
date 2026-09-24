@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getOrCreateShopSettings } from "../lib/ledger.server";
 import { getLoyaltySnapshot, ratesPayload } from "../lib/loyalty.server";
+import { parseRequestUrl } from "../lib/request-url.server";
 
 const GUEST_CACHE = "public, max-age=300, stale-while-revalidate=600";
 const MEMBER_CACHE = "private, max-age=45";
@@ -26,7 +27,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return jsonWithCache({ loggedIn: false }, "private, no-store");
   }
 
-  const url = new URL(request.url);
+  const url = parseRequestUrl(request);
   const customerId = url.searchParams.get("logged_in_customer_id");
   const settings = await getOrCreateShopSettings(session.shop);
   const rates = ratesPayload(settings);

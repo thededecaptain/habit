@@ -1,6 +1,9 @@
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
 
 import { authenticate } from "../shopify.server";
+import { captureServerException } from "../instrument.server";
+import { parseRequestUrl } from "./request-url.server";
+import { withTransientRetry } from "./transient-retry.server";
 import {
   captureWelcomePlanHandle,
   fetchAppPricingSubscription,
@@ -47,26 +50,46 @@ type ShopBillingContext = {
   partnerDevelopment: boolean;
 };
 
+// Shop id and dev-store flag don't change between page loads, so cache them
+// per shop instead of querying Shopify on every navigation.
+const SHOP_CONTEXT_TTL_MS = 60 * 60 * 1000;
+const shopContextCache = new Map<
+  string,
+  { value: ShopBillingContext; expiresAt: number }
+>();
+
 export async function loadShopBillingContext(
   admin: AdminApiContext,
   shop?: string,
 ): Promise<ShopBillingContext> {
-  const response = await admin.graphql(`#graphql
-    query ShopBillingContext {
-      shop {
-        id
-        plan {
-          partnerDevelopment
+  const cached = shop ? shopContextCache.get(shop) : undefined;
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const json = await withTransientRetry(async () => {
+    const response = await admin.graphql(`#graphql
+      query ShopBillingContext {
+        shop {
+          id
+          plan {
+            partnerDevelopment
+          }
         }
       }
-    }
-  `);
-  const json = await response.json();
-  return {
+    `);
+    return response.json();
+  });
+  const context = {
     shop,
     shopId: json.data?.shop?.id,
     partnerDevelopment: Boolean(json.data?.shop?.plan?.partnerDevelopment),
   };
+  if (shop && context.shopId) {
+    shopContextCache.set(shop, {
+      value: context,
+      expiresAt: Date.now() + SHOP_CONTEXT_TTL_MS,
+    });
+  }
+  return context;
 }
 
 export async function shouldUseTestCharges(admin: AdminApiContext) {
@@ -111,7 +134,7 @@ export async function findPaidAccess(
 ): Promise<PaidAccess | null> {
   // Include test charges. Dev stores can only create those; excluding them
   // sends an approved shop back to Choose your plan.
-  const check = await billing.check({ isTest: true });
+  const check = await withTransientRetry(() => billing.check({ isTest: true }));
   const subscription = check.appSubscriptions[0];
   if (check.hasActivePayment && subscription) {
     return paidAccessFromSubscription(subscription);
@@ -151,22 +174,24 @@ export async function findPaidAccess(
 }
 
 async function loadActiveBillingSubscription(admin: AdminApiContext) {
-  const response = await admin.graphql(`#graphql
-    query CurrentAppSubscriptions {
-      currentAppInstallation {
-        activeSubscriptions {
-          id
-          name
-          status
-          test
-          trialDays
-          createdAt
-          currentPeriodEnd
+  const json = await withTransientRetry(async () => {
+    const response = await admin.graphql(`#graphql
+      query CurrentAppSubscriptions {
+        currentAppInstallation {
+          activeSubscriptions {
+            id
+            name
+            status
+            test
+            trialDays
+            createdAt
+            currentPeriodEnd
+          }
         }
       }
-    }
-  `);
-  const json = await response.json();
+    `);
+    return response.json();
+  });
   const subscriptions =
     json.data?.currentAppInstallation?.activeSubscriptions ?? [];
   return (
@@ -176,8 +201,44 @@ async function loadActiveBillingSubscription(admin: AdminApiContext) {
   );
 }
 
+// The layout loader and the page loader both need paid access on every
+// navigation, and they run in parallel. Share one lookup per shop for a short
+// window so a page load costs one round of billing calls, not two.
+const PAID_ACCESS_TTL_MS = 60 * 1000;
+const paidAccessCache = new Map<
+  string,
+  { value: Promise<PaidAccess | null>; expiresAt: number }
+>();
+
+export function getPaidAccess(
+  billing: Awaited<ReturnType<typeof authenticate.admin>>["billing"],
+  shopContext: ShopBillingContext,
+  admin?: AdminApiContext,
+): Promise<PaidAccess | null> {
+  const shop = shopContext.shop;
+  if (!shop) return findPaidAccess(billing, shopContext, admin);
+
+  const cached = paidAccessCache.get(shop);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const value = findPaidAccess(billing, shopContext, admin);
+  paidAccessCache.set(shop, { value, expiresAt: Date.now() + PAID_ACCESS_TTL_MS });
+  // Never cache a failure or a missing plan: the next load should ask again.
+  value.then(
+    (access) => {
+      if (!access) clearPaidAccessCache(shop);
+    },
+    () => clearPaidAccessCache(shop),
+  );
+  return value;
+}
+
+export function clearPaidAccessCache(shop: string) {
+  paidAccessCache.delete(shop);
+}
+
 export async function requireStandardPlan(request: Request) {
-  const url = new URL(request.url);
+  const url = parseRequestUrl(request);
   if (url.pathname.startsWith("/app/billing")) {
     return authenticate.admin(request);
   }
@@ -185,9 +246,19 @@ export async function requireStandardPlan(request: Request) {
   const { admin, billing, redirect, session, ...rest } =
     await authenticate.admin(request);
   await captureWelcomePlanHandle(request, session.shop);
-  const shopContext = await loadShopBillingContext(admin, session.shop);
+
+  let shopContext: ShopBillingContext;
+  let access: PaidAccess | null;
+  try {
+    shopContext = await loadShopBillingContext(admin, session.shop);
+    access = await getPaidAccess(billing, shopContext, admin);
+  } catch (error) {
+    // Shopify stayed unreachable through the retries. Let this page load
+    // rather than show a 500; the plan is checked again on the next request.
+    captureServerException(error, { phase: "requireStandardPlan", shop: session.shop });
+    return { admin, billing, redirect, session, ...rest, isTest: false, access: null };
+  }
   const isTest = testChargesFromEnvOrContext(shopContext.partnerDevelopment);
-  const access = await findPaidAccess(billing, shopContext, admin);
 
   if (!access) {
     throw await redirectToSubscribe(redirect, session.shop, shopContext);
@@ -216,7 +287,7 @@ export function storeHandleFromShop(shop: string) {
 export function embeddedAppUrl(request: Request, shop: string) {
   const apiKey = process.env.SHOPIFY_API_KEY || "";
   const store = storeHandleFromShop(shop);
-  const host = new URL(request.url).searchParams.get("host");
+  const host = parseRequestUrl(request).searchParams.get("host");
   if (host) {
     try {
       const decoded = atob(host);

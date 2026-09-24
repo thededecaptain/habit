@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { runExpirePointsJob, runOutboxJob } from "../lib/jobs.server";
+import { parseRequestUrl } from "../lib/request-url.server";
 
 function secretsEqual(provided: string, expected: string) {
   const a = Buffer.from(provided);
@@ -17,7 +18,7 @@ function authorize(request: Request) {
 
   const header = request.headers.get("Authorization");
   const bearer = header?.startsWith("Bearer ") ? header.slice(7) : "";
-  const querySecret = new URL(request.url).searchParams.get("secret") ?? "";
+  const querySecret = parseRequestUrl(request).searchParams.get("secret") ?? "";
 
   if ((bearer && secretsEqual(bearer, expected)) || (querySecret && secretsEqual(querySecret, expected))) {
     return;
@@ -27,7 +28,7 @@ function authorize(request: Request) {
 }
 
 async function resolveJob(request: Request): Promise<"outbox" | "expire-points"> {
-  const fromQuery = new URL(request.url).searchParams.get("job");
+  const fromQuery = parseRequestUrl(request).searchParams.get("job");
   let job = fromQuery;
   if (!job && request.method !== "GET") {
     try {

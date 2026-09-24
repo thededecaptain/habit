@@ -8,6 +8,7 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 import { bootstrapShop } from "./lib/discount.server";
+import { withInvalidUrlGuard } from "./lib/request-url.server";
 import {
   STANDARD_PLAN,
   STANDARD_PLAN_AMOUNT,
@@ -57,8 +58,23 @@ const shopify = shopifyApp({
 export default shopify;
 export const apiVersion = ApiVersion.July26;
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
-export const authenticate = shopify.authenticate;
+export const authenticate = {
+  ...shopify.authenticate,
+  admin: withInvalidUrlGuard((request: Request) => shopify.authenticate.admin(request)),
+  public: {
+    ...shopify.authenticate.public,
+    checkout: withInvalidUrlGuard((request: Request) =>
+      shopify.authenticate.public.checkout(request),
+    ),
+    customerAccount: withInvalidUrlGuard((request: Request) =>
+      shopify.authenticate.public.customerAccount(request),
+    ),
+    appProxy: withInvalidUrlGuard((request: Request) =>
+      shopify.authenticate.public.appProxy(request),
+    ),
+  },
+};
 export const unauthenticated = shopify.unauthenticated;
-export const login = shopify.login;
+export const login = withInvalidUrlGuard((request: Request) => shopify.login(request));
 export const registerWebhooks = shopify.registerWebhooks;
 export const sessionStorage = shopify.sessionStorage;

@@ -1,3 +1,5 @@
+import { throwInvalidUrlAs400 } from "./request-url.server";
+
 /**
  * authenticate.public.* runs the request's User-Agent through isbot and
  * answers 410 Gone before our loader sees it. isbot flags more than crawlers:
@@ -18,7 +20,11 @@ export function allowExtensionUserAgent(request: Request) {
 
   // Body is intentionally dropped: these handlers read the session token and
   // query string only, and cloning a stream here would need duplex plumbing.
-  return new Request(request.url, { method: request.method, headers });
+  try {
+    return new Request(request.url, { method: request.method, headers });
+  } catch (error) {
+    throwInvalidUrlAs400(error);
+  }
 }
 
 /**

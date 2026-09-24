@@ -6,6 +6,7 @@ import {
 } from "../lib/extension-request.server";
 import { getOrCreateShopSettings } from "../lib/ledger.server";
 import { getLoyaltySnapshot, ratesPayload } from "../lib/loyalty.server";
+import { parseRequestUrl } from "../lib/request-url.server";
 
 /**
  * Session-token-authenticated endpoint the redeem-points checkout UI
@@ -20,7 +21,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
   const shop = shopFromSessionTokenDest(sessionToken.dest);
 
-  const url = new URL(request.url);
+  const url = parseRequestUrl(request);
   const customerId = url.searchParams.get("customerId");
   const settings = await getOrCreateShopSettings(shop);
   const shared = ratesPayload(settings);

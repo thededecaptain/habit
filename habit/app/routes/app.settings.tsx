@@ -11,7 +11,9 @@ import {
   STANDARD_PLAN_AMOUNT,
   STANDARD_PLAN_TRIAL_DAYS,
   clearAppPricingGrant,
+  clearPaidAccessCache,
   findPaidAccess,
+  getPaidAccess,
   loadShopBillingContext,
   redirectToSubscribe,
   shouldUseTestCharges,
@@ -81,8 +83,17 @@ type FormState = {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin, billing } = await authenticate.admin(request);
   const settings = await getOrCreateShopSettings(session.shop);
-  const shopContext = await loadShopBillingContext(admin, session.shop);
-  const access = await findPaidAccess(billing, shopContext, admin);
+  let access: Awaited<ReturnType<typeof getPaidAccess>> = null;
+  let billingUnavailable = false;
+  try {
+    const shopContext = await loadShopBillingContext(admin, session.shop);
+    access = await getPaidAccess(billing, shopContext, admin);
+  } catch (error) {
+    // Shopify unreachable after retries: still render Settings, just without
+    // the plan details.
+    console.warn(`Could not load billing status for ${session.shop}`, error);
+    billingUnavailable = true;
+  }
 
   const values: FormState = {
     pointsPerDollar: formatSettingNumber(settings.pointsPerDollar),
@@ -110,6 +121,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     values,
     amount: STANDARD_PLAN_AMOUNT,
     trialDays: STANDARD_PLAN_TRIAL_DAYS,
+    billingUnavailable,
     subscription: access
       ? {
           source: access.source,
@@ -184,6 +196,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const shopContext = await loadShopBillingContext(admin, session.shop);
     const access = await findPaidAccess(billing, shopContext, admin);
     await clearAppPricingGrant(session.shop);
+    clearPaidAccessCache(session.shop);
     if (access?.billingSubscriptionId) {
       const isTest = await shouldUseTestCharges(admin);
       try {
@@ -303,7 +316,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Settings() {
-  const { values, amount, trialDays, subscription } = useLoaderData<typeof loader>();
+  const { values, amount, trialDays, subscription, billingUnavailable } =
+    useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const billingFetcher = useFetcher();
   const shopify = useAppBridge();
@@ -382,7 +396,7 @@ export default function Settings() {
         <s-stack direction="block" gap="base">
           <s-stack direction="inline" gap="small-200" alignItems="center">
             <s-text type="strong">Standard · ${amount}/month</s-text>
-            {subscription ? (
+            {billingUnavailable ? null : subscription ? (
               <s-badge tone={inTrial ? "info" : "success"}>
                 {inTrial ? "Trial" : "Active"}
               </s-badge>
@@ -390,7 +404,11 @@ export default function Settings() {
               <s-badge tone="warning">Inactive</s-badge>
             )}
           </s-stack>
-          {subscription ? (
+          {billingUnavailable ? (
+            <s-paragraph color="subdued">
+              Couldn't reach Shopify to load your plan. Refresh the page to try again.
+            </s-paragraph>
+          ) : subscription ? (
             <s-paragraph color="subdued">
               {inTrial && subscription.trialEndsAt
                 ? `Trial ends ${new Date(subscription.trialEndsAt).toLocaleDateString()}. Then $${amount}/month.`
@@ -403,7 +421,7 @@ export default function Settings() {
               Start a {trialDays}-day free trial to keep Habit running.
             </s-paragraph>
           )}
-          {subscription ? (
+          {billingUnavailable ? null : subscription ? (
             <s-button
               tone="critical"
               commandFor="cancel-subscription-modal"

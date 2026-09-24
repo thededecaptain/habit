@@ -5,6 +5,7 @@ import {
   clearAppPricingGrant,
   rememberAppPricingGrant,
 } from "../lib/app-pricing.server";
+import { clearPaidAccessCache } from "../lib/billing.server";
 
 type SubscriptionPayload = {
   status?: string;
@@ -19,6 +20,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop, topic, payload } = await authenticate.webhook(request);
   console.log(`Received ${topic} webhook for ${shop}`);
 
+  clearPaidAccessCache(shop);
   const body = payload as SubscriptionPayload;
   const status = (
     body.app_subscription?.status ??

@@ -6,6 +6,7 @@ import {
   trialEndsAt,
 } from "./billing-plan";
 import { getOrCreateShopSettings } from "./ledger.server";
+import { parseRequestUrl } from "./request-url.server";
 
 const PARTNER_API_VERSION = "2026-07";
 
@@ -177,7 +178,7 @@ function paidAccessFromGrant(planHandle: string, grantedAt: Date) {
 }
 
 export async function captureWelcomePlanHandle(request: Request, shop: string) {
-  const handle = new URL(request.url).searchParams.get("plan_handle");
+  const handle = parseRequestUrl(request).searchParams.get("plan_handle");
   if (!handle) return null;
   return rememberAppPricingGrant(shop, handle);
 }

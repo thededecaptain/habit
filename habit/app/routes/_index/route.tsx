@@ -3,6 +3,7 @@ import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { redirect, useLoaderData } from "react-router";
 
 import { APP_STORE_INSTALL_URL } from "../../lib/brand";
+import { parseRequestUrl } from "../../lib/request-url.server";
 
 import styles from "./styles.module.css";
 
@@ -15,7 +16,7 @@ export const meta: MetaFunction = () => [
 ];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const url = new URL(request.url);
+  const url = parseRequestUrl(request);
   const params = url.searchParams;
 
   // Shopify admin loads application_url in an iframe. App Pricing welcome
