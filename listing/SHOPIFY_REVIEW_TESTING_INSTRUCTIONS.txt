@@ -36,7 +36,7 @@ Signed in, place a paid test order (Bogus Gateway). Habit → Members: the custo
 With 100+ points, start a second order. Apply points in the cart or at checkout → the discount appears on the total → complete the order. Members shows the lower balance and a REDEEM row.
 
 9. REFERRALS
-Habit → Referrals → Create a referral code: pick customer A, code FRIEND10 → Create code. Sign in as another customer B, add a product, open the cart → "Have a referral code?" → FRIEND10 → Apply code → place a paid order. Referrals shows FRIEND10 as Used; Members shows referral bonuses for A and B.
+Habit → Referrals → Create a referral code: pick customer A, code FRIEND10 → Create code. Sign in as a new customer B (no prior orders), add a product, open the cart → "Have a referral code?" → FRIEND10 → Apply code → place a paid order. Referrals shows FRIEND10 as Used; Members shows referral bonuses for A and B.
 
 Defaults: 1 point per $1, 100 points = $1 off (Habit → Settings).
 Cancel anytime: Habit → Settings → Cancel subscription (self-service).

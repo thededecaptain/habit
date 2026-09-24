@@ -19,6 +19,8 @@ Points only post after the order is paid. Drafts, unpaid checkouts, and guest or
 
 Customers spend points as a discount. Conversion uses **Points needed for $1 off**, plus your minimum balance and max percent of the **subtotal**.
 
+Customers must be signed in to redeem, and can never redeem more than their balance. Checkout checks the balance itself, so editing the cart can't unlock a bigger discount. Habit deducts only what the discount was actually worth. For example, if the cart shrinks after points are applied and the discount gets capped, the customer keeps the difference.
+
 They can redeem:
 
 - In the **cart**, on every Shopify plan
@@ -28,9 +30,13 @@ See [storefront and checkout](/storefront) and [checkout redemption](/program/ch
 
 ## Refunds
 
-Refunding an order claws back points in proportion to the refunded amount versus the original subtotal. A full refund reverses the full earn for that order. A 50% refund reverses about half.
+When items are refunded, Habit adjusts the ledger in proportion to the share of the order's subtotal refunded so far:
 
-You do not need to adjust the ledger by hand.
+- **Points earned** on the order are clawed back. A full refund reverses the whole earn, and two 50% refunds add up to a full reversal.
+- **Points spent** on the order's discount are returned to the customer.
+- On a **full refund**, referral bonuses the order triggered are reversed for both the referrer and the new customer.
+
+Refunds of money only (no items), and shipping refunds, don't change points. You do not need to adjust the ledger by hand.
 
 If those points were already spent, the balance can go negative until future purchases cover it. Habit does not delete later redemptions.
 
