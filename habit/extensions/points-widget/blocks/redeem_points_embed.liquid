@@ -117,6 +117,52 @@
   {% endif %}
 </template>
 
+{% comment %}
+  Referral entry: shown to everyone with items in the cart, guests included,
+  since a referred friend is usually a new customer. Saves the code as the
+  `referral_code` cart attribute, which the orders/paid webhook reads. This is
+  the referral path for stores without Shopify Plus checkout extensions.
+{% endcomment %}
+{% if block.settings.show_referral %}
+  <template id="habit-referral-template">
+    <div
+      class="habit-widget habit-widget--compact habit-referral"
+      data-habit-referral
+      data-proxy-url="/apps/habit"
+      style="
+        {% if block.settings.accent_color != blank and block.settings.accent_color != '#121212' %}--habit-accent: {{ block.settings.accent_color }};{% endif %}
+        --habit-radius: {{ block.settings.corner_radius }}px;
+      "
+    >
+      <details class="habit-widget__referral" data-habit-referral-details>
+        <summary>{{ block.settings.referral_summary | default: 'Have a referral code?' }}</summary>
+        <div class="habit-redeem__field">
+          <label class="habit-redeem__label">
+            {{ block.settings.referral_label | default: 'Referral code' }}
+            <input
+              type="text"
+              data-habit-referral-input
+              maxlength="24"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+            >
+          </label>
+        </div>
+        <div class="habit-redeem__actions">
+          <button type="button" class="habit-widget__button" data-habit-referral-apply>
+            {{ block.settings.referral_apply_text | default: 'Apply code' }}
+          </button>
+          <button type="button" class="habit-widget__button habit-widget__button--ghost" data-habit-referral-remove hidden>
+            {{ block.settings.remove_text | default: 'Remove' }}
+          </button>
+        </div>
+        <p class="habit-widget__status" data-habit-referral-status role="status"></p>
+      </details>
+    </div>
+  </template>
+{% endif %}
+
 {% schema %}
 {
   "name": "Redeem points in cart",
@@ -129,6 +175,10 @@
     { "type": "text", "id": "input_label", "label": "Input label", "default": "Points to redeem" },
     { "type": "text", "id": "apply_text", "label": "Apply button text", "default": "Apply points" },
     { "type": "text", "id": "remove_text", "label": "Remove button text", "default": "Remove" },
+    { "type": "checkbox", "id": "show_referral", "label": "Show referral code field in cart", "default": true },
+    { "type": "text", "id": "referral_summary", "label": "Referral field heading", "default": "Have a referral code?" },
+    { "type": "text", "id": "referral_label", "label": "Referral input label", "default": "Referral code" },
+    { "type": "text", "id": "referral_apply_text", "label": "Referral apply button text", "default": "Apply code" },
     { "type": "color", "id": "accent_color", "label": "Accent color", "default": "#121212" },
     { "type": "range", "id": "corner_radius", "label": "Corner radius", "min": 0, "max": 24, "step": 2, "default": 8 }
   ]

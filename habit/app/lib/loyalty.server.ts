@@ -251,7 +251,12 @@ export async function getLoyaltySnapshot(
 
   const activeCode = record
     ? await prisma.referralCode.findFirst({
-        where: { shop, ownerId: record.id, status: "ACTIVE" },
+        where: {
+          shop,
+          ownerId: record.id,
+          status: "ACTIVE",
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
         orderBy: { createdAt: "desc" },
       })
     : null;
@@ -272,4 +277,49 @@ export async function getLoyaltySnapshot(
     : undefined;
 
   return toCard(settings, record, next, activeCode?.code ?? null, history);
+}
+
+export type ShopifyCustomerOption = {
+  id: string;
+  email: string | null;
+  displayName: string | null;
+};
+
+/**
+ * Searches the store's Shopify customers (not only Habit members), so a
+ * merchant can give a referral code to anyone — including a customer who
+ * hasn't ordered yet and so has no Habit record.
+ */
+export async function searchShopifyCustomers(
+  admin: AdminClient,
+  query: string,
+  limit = 10,
+): Promise<ShopifyCustomerOption[]> {
+  const response = await admin.graphql(
+    `#graphql
+    query HabitCustomerSearch($first: Int!, $query: String) {
+      customers(first: $first, query: $query, sortKey: UPDATED_AT, reverse: true) {
+        nodes {
+          id
+          firstName
+          lastName
+          defaultEmailAddress { emailAddress }
+        }
+      }
+    }`,
+    { variables: { first: limit, query: query.trim() || null } },
+  );
+  const json = await response.json();
+  return (json?.data?.customers?.nodes ?? [])
+    .filter((node: { id?: string }) => node?.id)
+    .map((node: {
+      id: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      defaultEmailAddress?: { emailAddress?: string | null } | null;
+    }) => ({
+      id: String(node.id).replace(/^gid:\/\/shopify\/Customer\//, ""),
+      email: node.defaultEmailAddress?.emailAddress ?? null,
+      displayName: displayNameFrom(node.firstName, node.lastName),
+    }));
 }

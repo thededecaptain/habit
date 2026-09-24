@@ -364,31 +364,78 @@ function generateCode(length = 8) {
 
 export class ReferralError extends Error {}
 
+const REFERRAL_CODE_PATTERN = /^[A-Z0-9_-]{4,24}$/;
+
+/** Uppercases a code and checks it's something a shopper can type. */
+export function normalizeReferralCode(raw: string) {
+  const code = raw.trim().toUpperCase();
+  if (!REFERRAL_CODE_PATTERN.test(code)) {
+    throw new ReferralError(
+      "Codes must be 4–24 characters: letters, numbers, dashes, or underscores.",
+    );
+  }
+  return code;
+}
+
 /**
  * Creates a referral code for a customer, enforcing the shop's active-code
  * rate limit (fraud protection: prevents mass code generation).
+ *
+ * Merchants creating codes from the admin can choose the code and expiry and
+ * are not held to the per-customer limit, which exists to stop shoppers from
+ * minting codes in bulk.
  */
-export async function createReferralCode(shop: string, shopifyCustomerId: string) {
+export async function createReferralCode(
+  shop: string,
+  shopifyCustomerId: string,
+  options: {
+    code?: string;
+    // null = never expires; undefined = the shop's default expiry.
+    expiresInDays?: number | null;
+    createdByMerchant?: boolean;
+    email?: string | null;
+    displayName?: string | null;
+  } = {},
+) {
   const settings = await getOrCreateShopSettings(shop);
-  const owner = await getOrCreateCustomer(shop, shopifyCustomerId);
+  const owner = await getOrCreateCustomer(
+    shop,
+    shopifyCustomerId,
+    options.email,
+    options.displayName,
+  );
 
-  const activeCount = await prisma.referralCode.count({
-    where: { shop, ownerId: owner.id, status: ReferralCodeStatus.ACTIVE },
-  });
-  if (activeCount >= settings.maxActiveReferralCodesPerCustomer) {
-    throw new ReferralError(
-      `You can have at most ${settings.maxActiveReferralCodesPerCustomer} active referral codes at a time.`,
-    );
+  if (!options.createdByMerchant) {
+    const activeCount = await prisma.referralCode.count({
+      where: { shop, ownerId: owner.id, status: ReferralCodeStatus.ACTIVE },
+    });
+    if (activeCount >= settings.maxActiveReferralCodesPerCustomer) {
+      throw new ReferralError(
+        `You can have at most ${settings.maxActiveReferralCodesPerCustomer} active referral codes at a time.`,
+      );
+    }
   }
 
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + settings.referralCodeExpiryDays);
+  const expiresInDays =
+    options.expiresInDays === undefined ? settings.referralCodeExpiryDays : options.expiresInDays;
+  const expiresAt = expiresInDays == null ? null : new Date(Date.now() + expiresInDays * DAY_MS);
 
-  let code = generateCode();
-  for (let attempts = 0; attempts < 5; attempts++) {
-    const collision = await prisma.referralCode.findUnique({ where: { code } });
-    if (!collision) break;
+  let code: string;
+  if (options.code) {
+    code = normalizeReferralCode(options.code);
+    const taken = await prisma.referralCode.findUnique({
+      where: { shop_code: { shop, code } },
+    });
+    if (taken) throw new ReferralError(`The code ${code} is already in use.`);
+  } else {
     code = generateCode();
+    for (let attempts = 0; attempts < 5; attempts++) {
+      const collision = await prisma.referralCode.findUnique({
+        where: { shop_code: { shop, code } },
+      });
+      if (!collision) break;
+      code = generateCode();
+    }
   }
 
   const created = await prisma.referralCode.create({
@@ -405,6 +452,47 @@ export async function createReferralCode(shop: string, shopifyCustomerId: string
 }
 
 /**
+ * Checks whether a code would be accepted, without redeeming it. Lets the
+ * cart tell a shopper up front instead of silently ignoring a bad code after
+ * the order is placed. The final check still happens in redeemReferralCode.
+ */
+export async function checkReferralCode(params: {
+  shop: string;
+  code: string;
+  refereeShopifyCustomerId?: string | null;
+}) {
+  const { shop, refereeShopifyCustomerId } = params;
+  const code = params.code.trim().toUpperCase();
+  const referralCode = code
+    ? await prisma.referralCode.findUnique({
+        where: { shop_code: { shop, code } },
+        include: { owner: true },
+      })
+    : null;
+  if (!referralCode) throw new ReferralError("That referral code doesn't exist.");
+  if (referralCode.status !== ReferralCodeStatus.ACTIVE) {
+    throw new ReferralError("This referral code is no longer active.");
+  }
+  if (referralCode.expiresAt && referralCode.expiresAt < new Date()) {
+    throw new ReferralError("This referral code has expired.");
+  }
+  if (refereeShopifyCustomerId) {
+    if (referralCode.owner.shopifyCustomerId === refereeShopifyCustomerId) {
+      throw new ReferralError("You can't use your own referral code.");
+    }
+    const referee = await prisma.customer.findUnique({
+      where: { shop_shopifyCustomerId: { shop, shopifyCustomerId: refereeShopifyCustomerId } },
+      include: { redeemedReferralCode: true },
+    });
+    if (referee?.redeemedReferralCode) {
+      throw new ReferralError("A referral code has already been used on this account.");
+    }
+  }
+  const settings = await getOrCreateShopSettings(shop);
+  return { code: referralCode.code, refereeBonusPoints: settings.refereeBonusPoints };
+}
+
+/**
  * Redeems a referral code on a referred customer's first order, crediting
  * both sides. Expired/already-redeemed/revoked codes are rejected.
  */
@@ -417,8 +505,8 @@ export async function redeemReferralCode(params: {
   const { shop, code, refereeShopifyCustomerId, orderId } = params;
   const settings = await getOrCreateShopSettings(shop);
 
-  const referralCode = await prisma.referralCode.findFirst({
-    where: { shop, code: code.toUpperCase() },
+  const referralCode = await prisma.referralCode.findUnique({
+    where: { shop_code: { shop, code: code.trim().toUpperCase() } },
   });
   if (!referralCode) throw new ReferralError("Referral code not found.");
   if (referralCode.status !== ReferralCodeStatus.ACTIVE) {

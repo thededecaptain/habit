@@ -188,7 +188,9 @@ enum ReferralCodeStatus {
 model ReferralCode {
   id     String             @id @default(uuid())
   shop   String
-  code   String             @unique
+  // Unique per shop, so merchants can pick readable codes (e.g. FRIEND10)
+  // without colliding with another store's.
+  code   String
   status ReferralCodeStatus @default(ACTIVE)
 
   ownerId String
@@ -202,6 +204,7 @@ model ReferralCode {
   pointTransactions PointTransaction[]
   createdAt         DateTime            @default(now())
 
+  @@unique([shop, code])
   @@index([shop])
   @@index([ownerId])
   // Supports the "alert on abnormal code-creation volume" fraud check.

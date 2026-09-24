@@ -2,6 +2,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { createReferralCode, ReferralError } from "../lib/ledger.server";
+import { parseRequestUrl } from "../lib/request-url.server";
 
 /**
  * Storefront-facing endpoint: generates (or returns the existing) referral
@@ -13,7 +14,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const url = new URL(request.url);
+  const url = parseRequestUrl(request);
   const customerId = url.searchParams.get("logged_in_customer_id");
   if (!customerId) {
     return Response.json({ error: "Log in to get your referral code." }, { status: 401 });
@@ -24,7 +25,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
   if (existing) {
     const active = await db.referralCode.findFirst({
-      where: { shop: session.shop, ownerId: existing.id, status: "ACTIVE" },
+      where: {
+        shop: session.shop,
+        ownerId: existing.id,
+        status: "ACTIVE",
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
       orderBy: { createdAt: "desc" },
     });
     if (active) {

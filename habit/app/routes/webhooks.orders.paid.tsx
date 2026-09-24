@@ -4,6 +4,7 @@ import {
   awardPointsForOrder,
   finalizeRedemptionForOrder,
   redeemReferralCode,
+  ReferralError,
 } from "../lib/ledger.server";
 
 /**
@@ -93,9 +94,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         refereeShopifyCustomerId: String(customer.id),
         orderId,
       });
-    } catch {
-      // Invalid/expired/self-referral codes are silently ignored — the
+    } catch (error) {
+      // Invalid/expired/self-referral codes don't block the order — the
       // customer already sees an explanation client-side if it's rejected.
+      if (!(error instanceof ReferralError)) throw error;
+      console.warn(`Order ${orderId}: referral code ${referralCode} not applied — ${error.message}`);
     }
   }
 
