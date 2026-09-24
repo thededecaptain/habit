@@ -124,6 +124,7 @@
   the referral path for stores without Shopify Plus checkout extensions.
 {% endcomment %}
 {% if block.settings.show_referral %}
+  <script src="{{ 'referral-code.js' | asset_url }}" defer></script>
   <template id="habit-referral-template">
     <div
       class="habit-widget habit-widget--compact habit-referral"
