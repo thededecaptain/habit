@@ -107,7 +107,10 @@ export async function syncPointsBalances(
     }
     return synced;
   } catch (error) {
-    console.warn(`Points balance sync failed for ${shop}`, error);
+    // Expected until a shop approves write_customers; the cron retries, so
+    // one line is enough (the full error object dumps the whole response).
+    const message = error instanceof Error ? error.message.split(". ")[0] : String(error);
+    console.warn(`Points balance sync failed for ${shop}: ${message}`);
     return 0;
   }
 }

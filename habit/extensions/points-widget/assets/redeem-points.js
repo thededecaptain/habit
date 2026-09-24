@@ -201,6 +201,8 @@
 
   function inject(btn, cart) {
     if (!btn || cart.item_count < 1) return;
+    // The merchant placed the Redeem points block here; don't add a second.
+    if (document.querySelector("[data-habit-redeem]:not([data-habit-injected])")) return;
     var parent =
       btn.closest(".cart__ctas") ||
       btn.closest(".drawer__footer") ||
@@ -211,8 +213,6 @@
 
     var widget = cloneTemplate();
     if (!widget) return;
-    widget.setAttribute("data-cart-subtotal-cents", String(cart.total_price || 0));
-    widget.setAttribute("data-applied-points", String((cart.attributes && cart.attributes.points_to_redeem) || 0));
     var ctas = btn.closest(".cart__ctas");
     if (ctas && ctas.parentElement) ctas.parentElement.insertBefore(widget, ctas);
     else parent.insertBefore(widget, btn);
