@@ -10,6 +10,7 @@
     ".drawer__footer [name='checkout']",
     "form[action='/cart'] [name='checkout']",
     "form[action$='/cart'] [name='checkout']",
+    "[name='checkout'][form]",
   ];
   var timer;
 

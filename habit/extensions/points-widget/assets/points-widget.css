@@ -3,8 +3,11 @@
 }
 
 .habit-widget {
-  --habit-accent: var(--color-button, #121212);
-  --habit-on-accent: var(--color-button-text, #fff);
+  /* Not var(--color-button): Dawn-family themes store it as a bare "18, 18, 18"
+     triplet, which is not a color and leaves buttons transparent. The block
+     settings' accent color overrides this. */
+  --habit-accent: #121212;
+  --habit-on-accent: #fff;
   --habit-radius: var(--buttons-radius, 8px);
   display: block;
   width: 100%;
@@ -17,6 +20,13 @@
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: var(--habit-radius);
   padding: 1.25em;
+}
+
+/* `display` above would otherwise override the hidden attribute the scripts
+   use to hide an empty widget (e.g. a member without enough points). */
+.habit-widget[hidden],
+.habit-widget [hidden] {
+  display: none !important;
 }
 
 .habit-widget *,
