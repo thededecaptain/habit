@@ -40,6 +40,11 @@ jobs:
       - name: Validate webhook URIs
         run: npm run validate:webhooks
 
+      # The Function's input types are generated (not committed); the app's
+      # typecheck includes the Function source.
+      - name: Generate Shopify Function types
+        run: npm run typegen --workspace=points-redemption
+
       - name: Typecheck (app and tests)
         run: npm run typecheck
 
