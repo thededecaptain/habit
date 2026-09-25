@@ -217,7 +217,10 @@ export async function awardPointsForOrder(params: {
  *  - claws back the points the order earned;
  *  - gives back the points spent on the order's discount;
  *  - on a full refund, reverses the referral bonuses the order triggered
- *    (a friend ordering, collecting the bonus, then refunding).
+ *    (a friend ordering, collecting the bonus, then refunding);
+ *  - takes the refunded spend (and, on a full refund, the order) back out
+ *    of the member's lifetime totals and re-ranks their VIP tier, so a
+ *    refunded order can't buy tier status.
  * Each part is tracked by what was already reversed for the order, so
  * several partial refunds add up correctly and a redelivered webhook is a
  * no-op.
@@ -234,6 +237,7 @@ export async function reverseForRefund(params: {
   const rows = await prisma.pointTransaction.findMany({ where: { shop, orderId } });
   if (rows.length === 0) return [];
   const customerIds = [...new Set(rows.map((r) => r.customerId))];
+  const tiers = await prisma.vipTier.findMany({ where: { shop } });
 
   return prisma.$transaction(async (tx) => {
     for (const id of customerIds) await lockCustomer(tx, id);
@@ -281,6 +285,30 @@ export async function reverseForRefund(params: {
         PointTransactionType.REFUND_REVERSAL,
         `Refund clawback (${refundNote})`,
       );
+
+      // Lifetime totals: remove only what earlier refunds haven't already.
+      const spendDelta = Math.max(0, refundedAmount - Number(earn.spendReversed ?? 0));
+      const uncountOrder = proportion >= 1 && !earn.orderCountReversed;
+      if (spendDelta > 0 || uncountOrder) {
+        await tx.pointTransaction.update({
+          where: { id: earn.id },
+          data: {
+            spendReversed: Math.max(refundedAmount, Number(earn.spendReversed ?? 0)),
+            ...(uncountOrder ? { orderCountReversed: true } : {}),
+          },
+        });
+        const member = await tx.customer.findUniqueOrThrow({ where: { id: earn.customerId } });
+        const lifetimeSpend = Math.max(0, Number(member.lifetimeSpend) - spendDelta);
+        const lifetimeOrders = Math.max(0, member.lifetimeOrders - (uncountOrder ? 1 : 0));
+        await tx.customer.update({
+          where: { id: member.id },
+          data: {
+            lifetimeSpend,
+            lifetimeOrders,
+            vipTierId: resolveVipTier(tiers, lifetimeSpend, lifetimeOrders)?.id ?? null,
+          },
+        });
+      }
     }
 
     const redeem = current.find((r) => r.type === PointTransactionType.REDEEM);

@@ -176,6 +176,11 @@ model PointTransaction {
   orderId        String?
   referralCodeId String?
   referralCode   ReferralCode?        @relation(fields: [referralCodeId], references: [id])
+  // On an EARN row: how much of the order's spend refunds have already
+  // taken back out of the member's lifetime totals (VIP tiers), and whether
+  // the order itself was un-counted after a full refund.
+  spendReversed      Decimal? @db.Decimal(12, 2)
+  orderCountReversed Boolean  @default(false)
   description    String?
   createdAt      DateTime             @default(now())
 
