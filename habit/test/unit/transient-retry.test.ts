@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
-import { isTransientFetchError, withTransientRetry } from "./transient-retry.server";
+import { test } from "vitest";
+import { isTransientFetchError, withTransientRetry } from "../../app/lib/transient-retry.server";
 
 function httpRequestError() {
   const error = new Error("Http request error, no response available: GraphQL Client: fetch failed");

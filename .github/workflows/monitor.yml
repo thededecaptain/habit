@@ -1,0 +1,29 @@
+name: Production monitor
+
+# Checks the live app from the outside every 15 minutes: health and database,
+# public redirects, and that every webhook, app proxy, extension API and cron
+# endpoint refuses unsigned or tampered requests with a 4xx (never a 404 or
+# 5xx). A failed run makes GitHub send a failure notification.
+#
+# GitHub may delay scheduled runs by a few minutes, and pauses schedules after
+# 60 days without repository activity.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: habit/scripts
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check production
+        run: node habit/scripts/monitor.mjs

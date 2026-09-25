@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
-import { loyaltyDiscountAmount, pointsForDiscount } from "./order-discount.server";
+import { test } from "vitest";
+import { loyaltyDiscountAmount, pointsForDiscount } from "../../app/lib/order-discount.server";
 
 const TITLES = ["Loyalty points redemption", "Loyalty points redeemed"];
 

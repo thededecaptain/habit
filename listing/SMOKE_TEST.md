@@ -2,18 +2,27 @@
 
 Run these checks on a **clean browser profile** (or incognito) so Shopify admin cookies do not cause HTTP 431 during install.
 
-## Automated (from your machine)
+## Automated
 
-```bash
-cd habit
-npm run smoke
-```
+### Test suite (`cd habit && npm test`)
 
-This hits production `/health`, the public landing page, and confirms webhook routes return something other than 404 (Shopify sends real POSTs with HMAC — a bare POST should get 400, not 404). Set `HABIT_URL` to test another environment.
+- **App tests** (`npm run test:app`, Vitest, ~300 tests) in `habit/test/`:
+  - `unit/`: pure logic (Flow payloads, webhook HMAC fallback, retries, URL guards, discount math).
+  - `db/`: ledger, refunds, referrals, tiers, expiry, balance sync, notifications, billing, and every route's loader/action, against a real throwaway Postgres 17 (`embedded-postgres`) with every migration applied fresh. Nothing touches production.
+  - `ui/`: every admin page rendered in jsdom (create/revoke codes, adjust points, tiers, settings save bar, dashboard).
+  - `storefront/`: the theme scripts against Dawn's real cart and drawer markup.
+  - `extensions/`: the checkout, Thank you, and customer account blocks.
+  - Coverage thresholds live in `habit/vitest.config.ts`; the run fails if coverage drops.
+- **Shopify Function tests** (`npm run test:functions`): discount capping, including guests and tampered carts.
 
-CI also runs `npm run validate:webhooks` so webhook URIs in `shopify.app.toml` stay absolute (relative URIs resolve under `application_url`, which ends in `/app`, and Shopify would POST to `/app/webhooks/...` → 404).
+`npm run test:watch` re-runs tests as you edit.
 
-CI runs on every push to `main`: lint → build → Shopify Function tests.
+### CI and scheduled runs (GitHub Actions)
+
+- **`.github/workflows/ci.yml`**: on every push/PR to `main` and **nightly**: webhook config, typecheck, lint, build, app tests with coverage (report uploaded as an artifact), function tests.
+- **`.github/workflows/monitor.yml`**: **every 15 minutes** against production (`npm run monitor` runs it by hand): health and database, `/privacy` `/terms` `/support` redirects, and that every webhook, app proxy, extension API and cron endpoint refuses unsigned or tampered requests with a 4xx, never a 404 or 5xx. A failed run triggers GitHub's failure notification.
+
+`npm run smoke` (older, lighter) still works for a quick check.
 
 ## Manual checklist (~30 minutes)
 

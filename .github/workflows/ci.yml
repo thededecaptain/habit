@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Nightly full run, so a regression from a dependency, Shopify, or the
+  # clock (expiry, trials) shows up even on quiet days.
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
 
 defaults:
   run:
@@ -35,6 +40,9 @@ jobs:
       - name: Validate webhook URIs
         run: npm run validate:webhooks
 
+      - name: Typecheck (app and tests)
+        run: npm run typecheck
+
       - name: Lint app code
         run: npm run lint
 
@@ -43,8 +51,23 @@ jobs:
         env:
           SHOPIFY_API_KEY: placeholder-for-ci-build
           SHOPIFY_API_SECRET: placeholder-for-ci-build
-          SCOPES: read_orders,read_customers,write_discounts
+          SCOPES: read_orders,read_customers,write_customers,write_discounts
           SHOPIFY_APP_URL: https://example.com
 
+      # Unit, database (real Postgres 17 via embedded-postgres, every
+      # migration applied fresh), admin UI, storefront scripts, and checkout
+      # and account extensions. Fails if coverage drops below the thresholds
+      # in vitest.config.ts.
+      - name: App tests with coverage
+        run: npm run test:app
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: habit/coverage
+          retention-days: 14
+
       - name: Shopify Function tests
-        run: npm test
+        run: npm run test:functions
