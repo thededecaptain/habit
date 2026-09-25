@@ -141,7 +141,8 @@ function Extension() {
     return Math.max(0, Math.min(byBalance, byPercent));
   }, [points, subtotal.amount]);
 
-  const discountPreview = points ? redeemInput / points.redemptionRate : 0;
+  // Preview what will actually apply: Apply clamps to maxRedeemable too.
+  const discountPreview = points ? Math.min(redeemInput, maxRedeemable) / points.redemptionRate : 0;
   const appliedPoints = Number(attributeValue("points_to_redeem") ?? 0);
   const balanceValue =
     points?.balanceValue != null

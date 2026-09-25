@@ -6,7 +6,9 @@
 export function isInvalidUrlError(error: unknown): error is TypeError {
   if (!(error instanceof TypeError)) return false;
   if (error.message === "Invalid URL") return true;
-  return "code" in error && (error as { code?: string }).code === "ERR_INVALID_URL";
+  if ("code" in error && (error as { code?: string }).code === "ERR_INVALID_URL") return true;
+  // `new Request(badUrl)` wraps the URL error: "Failed to parse URL from …".
+  return isInvalidUrlError((error as { cause?: unknown }).cause);
 }
 
 export function throwInvalidUrlAs400(error: unknown): never {

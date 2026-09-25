@@ -7,6 +7,7 @@ import { PointTransactionType } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import { parseRequestUrl } from "../lib/request-url.server";
 import db from "../db.server";
+import { useDebounced } from "../components/use-debounced";
 import { syncPointsBalances } from "../lib/balance-sync.server";
 
 const ADJUST_MODAL_ID = "adjust-points-modal";
@@ -113,6 +114,7 @@ export default function Customers() {
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
   const [, setSearchParams] = useSearchParams();
+  const search = useDebounced((value: string) => setSearchParams(value ? { q: value } : {}));
   const modalRef = useRef<any>(null);
   const [target, setTarget] = useState<{ id: string; label: string } | null>(null);
   const [amount, setAmount] = useState("");
@@ -177,10 +179,7 @@ export default function Customers() {
           labelAccessibilityVisibility="exclusive"
           placeholder="Search by name, email, or customer ID"
           value={q}
-          onChange={(e: any) => {
-            const value = e.currentTarget?.value ?? "";
-            setSearchParams(value ? { q: value } : {});
-          }}
+          onInput={(e: any) => search(e.currentTarget?.value ?? "")}
         />
       </s-section>
 

@@ -32,7 +32,10 @@ function EditorPreview() {
 
 function Extension() {
   const customer = shopify.buyerIdentity?.customer?.value;
-  const orderTotal = Number(shopify.cost?.totalAmount?.value?.amount ?? 0);
+  // Points are earned on the subtotal, not the total with shipping and tax.
+  const orderSubtotal = Number(
+    shopify.cost?.subtotalAmount?.value?.amount ?? shopify.cost?.totalAmount?.value?.amount ?? 0,
+  );
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -43,8 +46,8 @@ function Extension() {
     (async () => {
       try {
         const token = await shopify.sessionToken.get();
-        const query = customer?.id ? `?customerId=${encodeURIComponent(customer.id)}` : "";
-        const response = await fetch(`${APP_URL}/checkout-api/points${query}`, {
+        // The server identifies the buyer from the session token.
+        const response = await fetch(`${APP_URL}/checkout-api/points`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -88,7 +91,7 @@ function Extension() {
 
   const rate = Number(data.pointsPerDollar || 0);
   const multiplier = Number(data.earnMultiplier || 1);
-  const earned = rate > 0 ? Math.floor(orderTotal * rate * multiplier) : 0;
+  const earned = rate > 0 ? Math.floor(orderSubtotal * rate * multiplier) : 0;
 
   if (!customer?.id || !data.loggedIn) {
     return (

@@ -1,4 +1,4 @@
-import { PointTransactionType, ReferralCodeStatus } from "@prisma/client";
+import { PointTransactionType, Prisma, ReferralCodeStatus } from "@prisma/client";
 import type { Customer, ShopSettings, VipTier } from "@prisma/client";
 import prisma from "../db.server";
 import { checkReferralVelocity } from "./fraud.server";
@@ -52,14 +52,25 @@ export async function getOrCreateCustomer(
   email?: string | null,
   displayName?: string | null,
 ): Promise<Customer> {
-  return prisma.customer.upsert({
-    where: { shop_shopifyCustomerId: { shop, shopifyCustomerId } },
-    update: {
-      ...(email ? { email } : {}),
-      ...(displayName ? { displayName } : {}),
-    },
-    create: { shop, shopifyCustomerId, email: email ?? null, displayName: displayName ?? null },
-  });
+  const upsert = () =>
+    prisma.customer.upsert({
+      where: { shop_shopifyCustomerId: { shop, shopifyCustomerId } },
+      update: {
+        ...(email ? { email } : {}),
+        ...(displayName ? { displayName } : {}),
+      },
+      create: { shop, shopifyCustomerId, email: email ?? null, displayName: displayName ?? null },
+    });
+  try {
+    return await upsert();
+  } catch (error) {
+    // Two webhooks for a brand-new customer (say, two orders paid at once)
+    // can both try to insert; the loser retries as an update.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return upsert();
+    }
+    throw error;
+  }
 }
 
 /**

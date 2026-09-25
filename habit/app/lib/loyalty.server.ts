@@ -94,9 +94,13 @@ function displayNameFrom(firstName?: string | null, lastName?: string | null) {
 }
 
 export async function fetchShopifyCustomers(admin: AdminClient, shopifyCustomerIds: string[]) {
-  const ids = [...new Set(shopifyCustomerIds.filter(Boolean))].map(
-    (id) => (id.startsWith("gid://") ? id : `gid://shopify/Customer/${id}`),
-  );
+  const ids = [
+    ...new Set(
+      shopifyCustomerIds
+        .filter(Boolean)
+        .map((id) => (id.startsWith("gid://") ? id : `gid://shopify/Customer/${id}`)),
+    ),
+  ];
   const map = new Map<string, ShopifyProfile>();
   if (ids.length === 0) return map;
 

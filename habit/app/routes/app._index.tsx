@@ -7,6 +7,7 @@ import db from "../db.server";
 import { getOrCreateShopSettings } from "../lib/ledger.server";
 import { docsHref } from "../lib/brand";
 import { SupportFooter } from "../components/support-footer";
+import { useElementEvent } from "../components/use-element-event";
 
 const THEME_EDITOR = "shopify://admin/themes/current/editor";
 const CART_EMBED =
@@ -287,6 +288,10 @@ export default function Dashboard() {
   const [guideOpen, setGuideOpen] = useState(true);
   const [openStep, setOpenStep] = useState(firstIncomplete === -1 ? 0 : firstIncomplete);
 
+  const velocityBannerRef = useElementEvent("dismiss", () =>
+    fetcher.submit({ intent: "dismiss-velocity-alert" }, { method: "POST" }),
+  );
+
   const dismissOnboarding = () => {
     fetcher.submit({ intent: "dismiss-onboarding" }, { method: "POST" });
   };
@@ -318,9 +323,7 @@ export default function Dashboard() {
           heading="Unusual referral activity"
           tone="warning"
           dismissible
-          onDismiss={() =>
-            fetcher.submit({ intent: "dismiss-velocity-alert" }, { method: "POST" })
-          }
+          ref={velocityBannerRef}
         >
           <s-stack direction="block" gap="small-200">
             <s-paragraph>

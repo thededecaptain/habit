@@ -15,6 +15,7 @@ import {
 import { syncCustomersFromShopify } from "../lib/loyalty.server";
 import type { ShopifyCustomerOption } from "../lib/loyalty.server";
 import { parseRequestUrl } from "../lib/request-url.server";
+import { useDebounced } from "../components/use-debounced";
 import type { loader as customerSearchLoader } from "./app.customer-search";
 
 const PAGE_SIZE = 50;
@@ -251,6 +252,9 @@ function CreateReferralCode({ defaultExpiryDays }: { defaultExpiryDays: number }
     }
   }, [createFetcher.state, createFetcher.data, shopify, defaultExpiryDays]);
 
+  const findCustomers = useDebounced((value: string) =>
+    searchFetcher.load(`/app/customer-search?q=${encodeURIComponent(value)}`),
+  );
   const results = searchFetcher.data?.customers ?? [];
 
   return (
@@ -281,10 +285,7 @@ function CreateReferralCode({ defaultExpiryDays }: { defaultExpiryDays: number }
               label="Referrer"
               placeholder="Search customers by name or email"
               error={errors.customer}
-              onInput={(e: any) => {
-                const value = e.currentTarget?.value ?? "";
-                searchFetcher.load(`/app/customer-search?q=${encodeURIComponent(value)}`);
-              }}
+              onInput={(e: any) => findCustomers(e.currentTarget?.value ?? "")}
             />
             {searchFetcher.data?.error ? (
               <s-text tone="critical">{searchFetcher.data.error}</s-text>
@@ -376,6 +377,7 @@ export default function Referrals() {
     }
   }, [revokeFetcher.state, revokeFetcher.data, shopify]);
 
+  const search = useDebounced((value: string) => setFilter({ q: value }));
   const setFilter = (next: { q?: string; status?: string }) => {
     const params = new URLSearchParams();
     const nextQ = next.q ?? q;
@@ -423,13 +425,13 @@ export default function Referrals() {
               labelAccessibilityVisibility="exclusive"
               placeholder="Search by code, name, or email"
               value={q}
-              onChange={(e: any) => setFilter({ q: e.currentTarget?.value ?? "" })}
+              onInput={(e: any) => search(e.currentTarget?.value ?? "")}
             />
             <s-select
               label="Status"
               labelAccessibilityVisibility="exclusive"
               value={status}
-              onChange={(e: any) => setFilter({ status: e.currentTarget?.value ?? "all" })}
+              onInput={(e: any) => setFilter({ status: e.currentTarget?.value ?? "all" })}
             >
               <s-option value="all">All statuses</s-option>
               <s-option value="active">Active</s-option>
