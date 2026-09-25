@@ -15,14 +15,10 @@ type LoyaltySettings = {
 /**
  * Redeems loyalty points for a fixed-amount order discount.
  *
- * The number of points to redeem can come from two places, depending on
- * merchant plan and how the buyer applied it:
- *  - a `$app` cart metafield, set by the redeem-points checkout UI
- *    extension (Shopify Plus only), or
- *  - a `points_to_redeem` cart attribute, set by the cart-page "Redeem
- *    points" theme app block via the classic Ajax Cart API (all plans).
- * The metafield wins when both are present, since it reflects the buyer's
- * most recent edit right up to payment. Either way, this Function
+ * The number of points to redeem comes from the `points_to_redeem` cart
+ * attribute, written by both the cart widget (all plans) and the checkout
+ * block (Plus); a `$app` cart metafield is still read for carts started
+ * before the checkout block switched to attributes. This Function
  * re-derives the discount amount from shop-level settings (synced to a
  * shop metafield whenever a merchant saves their loyalty settings) and
  * independently caps it at `maxRedemptionPercent` of the order subtotal.
@@ -35,7 +31,9 @@ type LoyaltySettings = {
 export function run(input: RunInput): FunctionRunResult {
   const fromMetafield = Number(input.cart.pointsMetafield?.value ?? 0);
   const fromAttribute = Number(input.cart.pointsAttribute?.value ?? 0);
-  const requested = fromMetafield > 0 ? fromMetafield : fromAttribute;
+  // Both the cart widget and the checkout block now write the attribute; the
+  // metafield is only read for carts started before that change.
+  const requested = fromAttribute > 0 ? fromAttribute : fromMetafield;
   if (!Number.isFinite(requested) || requested <= 0) {
     return EMPTY_DISCOUNT;
   }

@@ -11,10 +11,13 @@ export default async () => {
   render(<Extension />, document.body);
 };
 
-function metafieldValue(namespace, key) {
-  return shopify.appMetafields.value.find(
-    (m) => m.target.type === "cart" && m.metafield.namespace === namespace && m.metafield.key === key,
-  )?.metafield?.value;
+// Points and referral codes are saved as cart attributes, not cart
+// metafields: attributes always reach the order (where the orders/paid
+// webhook reads them), while cart metafields only do with an order metafield
+// definition — without one, points applied here were never deducted and
+// referral codes never counted.
+function attributeValue(key) {
+  return shopify.attributes.value.find((a) => a.key === key)?.value;
 }
 
 function money(n) {
@@ -92,17 +95,15 @@ function BalanceOnlyPanel({ points, balanceValue, reason }) {
 
 function Extension() {
   const inEditor = shopify.extension?.editor?.type === "checkout";
-  const canSetMetafields = shopify.instructions.value.metafields.canSetCartMetafields;
+  const canWrite = shopify.instructions.value.attributes.canUpdateAttributes;
   const customer = shopify.buyerIdentity?.customer?.value;
   const subtotal = shopify.cost.subtotalAmount.value;
 
   const [loading, setLoading] = useState(true);
   const [points, setPoints] = useState(null);
-  const [redeemInput, setRedeemInput] = useState(
-    Number(metafieldValue("$app", "points_to_redeem") ?? 0),
-  );
+  const [redeemInput, setRedeemInput] = useState(Number(attributeValue("points_to_redeem") ?? 0));
   const [applying, setApplying] = useState(false);
-  const [referralCode, setReferralCode] = useState(metafieldValue("$app", "referral_code") ?? "");
+  const [referralCode, setReferralCode] = useState(attributeValue("referral_code") ?? "");
   const [referralStatus, setReferralStatus] = useState("");
 
   useEffect(() => {
@@ -115,7 +116,7 @@ function Extension() {
       try {
         const token = await shopify.sessionToken.get();
         const response = await fetch(
-          `${APP_URL}/checkout-api/points?customerId=${encodeURIComponent(customer.id)}`,
+          `${APP_URL}/checkout-api/points`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
         const data = await response.json();
@@ -141,7 +142,7 @@ function Extension() {
   }, [points, subtotal.amount]);
 
   const discountPreview = points ? redeemInput / points.redemptionRate : 0;
-  const appliedPoints = Number(metafieldValue("$app", "points_to_redeem") ?? 0);
+  const appliedPoints = Number(attributeValue("points_to_redeem") ?? 0);
   const balanceValue =
     points?.balanceValue != null
       ? points.balanceValue
@@ -150,41 +151,49 @@ function Extension() {
         : 0;
 
   async function applyRedemption() {
-    if (!canSetMetafields) return;
+    if (!canWrite) return;
     setApplying(true);
     try {
       const clamped = Math.max(0, Math.min(redeemInput, maxRedeemable));
-      if (clamped <= 0) {
-        await shopify.applyMetafieldChange({ type: "removeCartMetafield", namespace: "$app", key: "points_to_redeem" });
-      } else {
-        await shopify.applyMetafieldChange({
-          type: "updateCartMetafield",
-          metafield: {
-            namespace: "$app",
-            key: "points_to_redeem",
-            type: "number_integer",
-            value: String(clamped),
-          },
-        });
-      }
+      await shopify.applyAttributeChange(
+        clamped <= 0
+          ? { type: "removeAttribute", key: "points_to_redeem" }
+          : { type: "updateAttribute", key: "points_to_redeem", value: String(clamped) },
+      );
     } finally {
       setApplying(false);
     }
   }
 
   async function applyReferralCode() {
-    if (!canSetMetafields || !referralCode.trim()) return;
-    setReferralStatus("Saving…");
-    const result = await shopify.applyMetafieldChange({
-      type: "updateCartMetafield",
-      metafield: {
-        namespace: "$app",
+    const code = referralCode.trim().toUpperCase();
+    if (!canWrite || !code) return;
+    setReferralStatus("Checking…");
+    try {
+      const token = await shopify.sessionToken.get();
+      const response = await fetch(
+        `${APP_URL}/checkout-api/referral-check?code=${encodeURIComponent(code)}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const data = await response.json();
+      if (!data.valid) {
+        setReferralStatus(data.error || "That code can't be used.");
+        return;
+      }
+      const result = await shopify.applyAttributeChange({
+        type: "updateAttribute",
         key: "referral_code",
-        type: "single_line_text_field",
-        value: referralCode.trim().toUpperCase(),
-      },
-    });
-    setReferralStatus(result.type === "error" ? "Couldn't save the code — try again." : "Applied. Verified after checkout.");
+        value: data.code,
+      });
+      setReferralStatus(
+        result.type === "error"
+          ? "Couldn't save the code — try again."
+          : `Code ${data.code} applied. You'll get ${Number(data.refereeBonusPoints || 0).toLocaleString()} bonus points after your order.`,
+      );
+    } catch (error) {
+      console.error("Referral check failed", error);
+      setReferralStatus("Couldn't check the code — try again.");
+    }
   }
 
   // Always show something in the checkout editor so merchants/reviewers can place and verify the block.
@@ -212,7 +221,7 @@ function Extension() {
         setReferralCode={setReferralCode}
         referralStatus={referralStatus}
         onApplyReferral={applyReferralCode}
-        canWrite={canSetMetafields}
+        canWrite={canWrite}
         signedIn={Boolean(customer?.id)}
       />
     );
@@ -264,7 +273,7 @@ function Extension() {
           min={0}
           max={maxRedeemable}
           step={points.minRedeemablePoints || 1}
-          disabled={!canSetMetafields}
+          disabled={!canWrite}
           onChange={(event) => {
             const raw = event.currentTarget.value;
             const next = raw === "" ? 0 : Number(raw);
@@ -283,7 +292,7 @@ function Extension() {
 
         <s-button
           variant="primary"
-          disabled={!canSetMetafields || applying || redeemInput === appliedPoints}
+          disabled={!canWrite || applying || redeemInput === appliedPoints}
           onClick={applyRedemption}
         >
           {appliedPoints > 0 ? "Update points" : "Apply points"}
@@ -297,13 +306,13 @@ function Extension() {
               labelAccessibilityVisibility="exclusive"
               placeholder="Enter a code"
               value={referralCode}
-              disabled={!canSetMetafields}
+              disabled={!canWrite}
               onChange={(event) => {
                 const raw = event.currentTarget.value;
                 setReferralCode(typeof raw === "string" ? raw : "");
               }}
             />
-            <s-button disabled={!canSetMetafields} onClick={applyReferralCode}>
+            <s-button disabled={!canWrite} onClick={applyReferralCode}>
               Apply code
             </s-button>
             {referralStatus ? <s-text color="subdued">{referralStatus}</s-text> : null}

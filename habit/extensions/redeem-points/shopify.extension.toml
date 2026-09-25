@@ -40,15 +40,3 @@ network_access = true
 # buyer) requires "Protected customer data" access, requested separately via
 # Partner Dashboard > App setup > API access requests. Automatically granted
 # for dev stores; required for public app review.
-
-# Loads metafields on checkout resources, including the cart,
-# products, customers, and more. Learn more:
-# https://shopify.dev/docs/api/checkout-ui-extensions/latest/configuration#metafields
-
-[[extensions.metafields]]
-namespace = "$app"
-key = "points_to_redeem"
-
-[[extensions.metafields]]
-namespace = "$app"
-key = "referral_code"

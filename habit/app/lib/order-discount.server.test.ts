@@ -64,3 +64,7 @@ test("pointsForDiscount converts at the redemption rate and caps at the request"
   assert.equal(pointsForDiscount(0, 100, 500), 0);
   assert.equal(pointsForDiscount(10, 0, 500), 0);
 });
+
+test("pointsForDiscount charges the discount's worth when no request reached the order", () => {
+  assert.equal(pointsForDiscount(4.33, 100, 0), 433);
+});

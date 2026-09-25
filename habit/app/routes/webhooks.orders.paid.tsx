@@ -20,17 +20,11 @@ import {
 } from "../lib/discount.server";
 
 /**
- * Awards ledger points when an order is paid. Also finalizes any point
- * redemption and referral code applied at checkout — these can come from
- * either of two sources depending on merchant plan:
- *  - `$app` cart metafields, set by the redeem-points checkout UI
- *    extension (Shopify Plus only), which Shopify copies onto the order
- *    as order metafields; or
- *  - `points_to_redeem` / `referral_code` cart attributes, set by the
- *    cart-page "Redeem points" theme app block via the classic Ajax Cart
- *    API (all plans), which land in the order's `note_attributes`.
- * The metafield wins when both are present, matching the Function's
- * priority (see extensions/points-redemption/src/run.ts).
+ * Awards ledger points when an order is paid, then settles any points
+ * redemption and referral code applied to the cart. Both the cart widget
+ * (all plans) and the checkout block (Plus) save those as the
+ * `points_to_redeem` / `referral_code` cart attributes, which land in the
+ * order's `note_attributes`.
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop, session, admin, payload, topic } = await authenticate.webhook(request);
@@ -64,49 +58,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const attributeValue = (name: string) =>
     noteAttributes.find((attr) => attr.name === name || attr.key === name)?.value ?? null;
 
-  let pointsRedeemed = Number(attributeValue("points_to_redeem") ?? 0);
-  let referralCode: string | null = attributeValue("referral_code");
+  const pointsRedeemed = Number(attributeValue("points_to_redeem") ?? 0);
+  const referralCode: string | null = attributeValue("referral_code");
   console.log(
     `Order ${orderId} loyalty attributes: points_to_redeem=${pointsRedeemed} referral=${referralCode ?? "(none)"} note_attributes=${JSON.stringify(noteAttributes)}`,
   );
 
-  try {
-    const response = await admin.graphql(
-      `#graphql
-      query OrderLoyaltyMetafields($id: ID!) {
-        order(id: $id) {
-          pointsToRedeem: metafield(namespace: "$app", key: "points_to_redeem") { value }
-          referralCode: metafield(namespace: "$app", key: "referral_code") { value }
-        }
-      }`,
-      { variables: { id: `gid://shopify/Order/${orderId}` } },
-    );
-    const json = await response.json();
-    const metafieldPoints = Number(json?.data?.order?.pointsToRedeem?.value ?? 0);
-    if (metafieldPoints > 0) pointsRedeemed = metafieldPoints;
-    referralCode = json?.data?.order?.referralCode?.value ?? referralCode;
-  } catch (error) {
-    console.error("Failed to fetch order loyalty metafields", error);
-  }
-
-  if (pointsRedeemed > 0) {
-    // Deduct what the discount was actually worth, not what the cart asked
-    // for: the Function caps the request at the balance and at the max
-    // percent of the subtotal, and the cart may have shrunk since.
-    const points = await pointsSpentOnOrder({
-      payload,
-      requested: pointsRedeemed,
+  // Deduct what the order's loyalty discount was actually worth, whenever
+  // one is on the order — not just when a points request reached us. The
+  // Function caps the request at the balance and the max percent, the cart
+  // may have shrunk since, and a request saved where the order can't see it
+  // (an old cart metafield) must still be paid for.
+  const points = await pointsSpentOnOrder({
+    payload,
+    requested: pointsRedeemed,
+    shop,
+    admin,
+  });
+  if (points > 0) {
+    await finalizeRedemptionForOrder({
       shop,
-      admin,
+      orderId,
+      shopifyCustomerId: String(customer.id),
+      points,
     });
-    if (points > 0) {
-      await finalizeRedemptionForOrder({
-        shop,
-        orderId,
-        shopifyCustomerId: String(customer.id),
-        points,
-      });
-    }
   }
 
   if (referralCode) {
@@ -144,14 +119,21 @@ async function pointsSpentOnOrder(params: {
   admin: { graphql: (query: string, options?: { variables?: Record<string, unknown> }) => Promise<Response> };
 }) {
   const { requested, shop, admin } = params;
+  const payload = params.payload as OrderDiscountPayload;
+  // Most orders carry no automatic discount at all; skip the lookups.
+  if (!(payload.discount_applications ?? []).some((a) => a.type === "automatic")) {
+    if (requested > 0) console.warn(`Order discount check: ${requested} points requested but no loyalty discount on the order`);
+    return 0;
+  }
+
   const settings = await getOrCreateShopSettings(shop);
   const titles = [REDEMPTION_DISCOUNT_TITLE, REDEMPTION_DISCOUNT_MESSAGE];
   const liveTitle = await loadRedemptionDiscountTitle(admin, settings.discountAutomaticId);
   if (liveTitle) titles.push(liveTitle);
 
-  const amount = loyaltyDiscountAmount(params.payload as OrderDiscountPayload, titles);
+  const amount = loyaltyDiscountAmount(payload, titles);
   if (amount == null) {
-    console.warn(`Order discount check: ${requested} points requested but no loyalty discount on the order`);
+    if (requested > 0) console.warn(`Order discount check: ${requested} points requested but no loyalty discount on the order`);
     return 0;
   }
   return pointsForDiscount(amount, Number(settings.redemptionRate), requested);

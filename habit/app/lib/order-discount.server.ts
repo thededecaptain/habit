@@ -38,8 +38,12 @@ export function loyaltyDiscountAmount(payload: OrderDiscountPayload, titles: str
   return amount;
 }
 
-/** Points a discount amount is worth, never more than the buyer asked to spend. */
+/**
+ * Points a discount amount is worth, never more than the buyer asked to
+ * spend. With no request on record (0), the discount alone decides.
+ */
 export function pointsForDiscount(amount: number, redemptionRate: number, requested: number) {
   if (!(redemptionRate > 0) || !(amount > 0)) return 0;
-  return Math.max(0, Math.min(requested, Math.round(amount * redemptionRate)));
+  const worth = Math.round(amount * redemptionRate);
+  return Math.max(0, requested > 0 ? Math.min(requested, worth) : worth);
 }
