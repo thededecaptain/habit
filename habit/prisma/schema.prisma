@@ -63,6 +63,8 @@ model ShopSettings {
   // Basic fraud guard: caps how many *unredeemed* codes a customer may hold
   // at once, independent of any Admin API rate limiting.
   maxActiveReferralCodesPerCustomer Int @default(5)
+  // Off: any customer can be referred once. On: only on their first order.
+  referralFirstOrderOnly Boolean @default(false)
 
   // Shop-wide referral-code velocity alert (codes created across the shop).
   referralVelocityThreshold     Int       @default(50)
@@ -212,6 +214,11 @@ model ReferralCode {
   redeemedAt           DateTime?
 
   expiresAt         DateTime?
+  // Why the code was last refused on an order (shown on the Referrals page,
+  // so a code that didn't pay out is never a silent failure).
+  lastRejectedAt      DateTime?
+  lastRejectedReason  String?
+  lastRejectedOrderId String?
   pointTransactions PointTransaction[]
   createdAt         DateTime            @default(now())
 

@@ -581,6 +581,7 @@ export async function checkReferralCode(params: {
   if (referralCode.expiresAt && referralCode.expiresAt < new Date()) {
     throw new ReferralError("This referral code has expired.");
   }
+  const settings = await getOrCreateShopSettings(shop);
   if (refereeShopifyCustomerId) {
     if (referralCode.owner.shopifyCustomerId === refereeShopifyCustomerId) {
       throw new ReferralError("You can't use your own referral code.");
@@ -592,17 +593,19 @@ export async function checkReferralCode(params: {
     if (referee?.redeemedReferralCode) {
       throw new ReferralError("A referral code has already been used on this account.");
     }
-    if (referee && referee.lifetimeOrders > 0) {
-      throw new ReferralError("Referral codes are for a customer's first order.");
+    if (settings.referralFirstOrderOnly && referee && referee.lifetimeOrders > 0) {
+      throw new ReferralError(FIRST_ORDER_ONLY);
     }
   }
-  const settings = await getOrCreateShopSettings(shop);
   return { code: referralCode.code, refereeBonusPoints: settings.refereeBonusPoints };
 }
 
+const FIRST_ORDER_ONLY = "This store only accepts referral codes on a customer's first order.";
+
 /**
- * Redeems a referral code on a referred customer's first order, crediting
- * both sides. Expired/already-redeemed/revoked codes are rejected.
+ * Redeems a referral code on a paid order, crediting both sides. A customer
+ * can be referred once (and, if the shop turns on referralFirstOrderOnly,
+ * only on their first order). Expired, used, and revoked codes are refused.
  */
 export async function redeemReferralCode(params: {
   shop: string;
@@ -633,8 +636,8 @@ export async function redeemReferralCode(params: {
     throw new ReferralError("You can't refer yourself.");
   }
   // Runs after this order was counted, so a first order shows as 1.
-  if (referee.lifetimeOrders > 1) {
-    throw new ReferralError("Referral codes are for a customer's first order.");
+  if (settings.referralFirstOrderOnly && referee.lifetimeOrders > 1) {
+    throw new ReferralError(FIRST_ORDER_ONLY);
   }
   const alreadyRedeemed = await prisma.referralCode.findFirst({
     where: { redeemedByCustomerId: referee.id },
@@ -669,7 +672,7 @@ export async function redeemReferralCode(params: {
         points: settings.referrerBonusPoints,
         referralCodeId: referralCode.id,
         orderId,
-        description: "Referral bonus (friend's first order)",
+        description: "Referral bonus (a friend used your code)",
       },
     });
     await tx.customer.update({
@@ -709,6 +712,26 @@ export async function redeemReferralCode(params: {
       uniqueKey: `${EVENT_REFERRAL_WELCOME}:${refereeTx.id}`,
       properties: { bonusPoints: settings.refereeBonusPoints, code: referralCode.code },
     });
+  });
+}
+
+/**
+ * Notes on the code why it wasn't applied to an order, for the Referrals
+ * page. Unknown codes have nowhere to record it and are only logged.
+ */
+export async function recordReferralRejection(params: {
+  shop: string;
+  code: string;
+  orderId: string;
+  reason: string;
+}) {
+  await prisma.referralCode.updateMany({
+    where: { shop: params.shop, code: params.code.trim().toUpperCase() },
+    data: {
+      lastRejectedAt: new Date(),
+      lastRejectedReason: params.reason,
+      lastRejectedOrderId: params.orderId,
+    },
   });
 }
 

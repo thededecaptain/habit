@@ -135,6 +135,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         redeemedAt: c.redeemedAt?.toISOString() ?? null,
         createdAt: c.createdAt.toISOString(),
         expiresAt: c.expiresAt?.toISOString() ?? null,
+        // Only worth showing while the code is still unused.
+        lastRejection:
+          c.lastRejectedReason && c.status !== ReferralCodeStatus.REDEEMED
+            ? { reason: c.lastRejectedReason, orderId: c.lastRejectedOrderId }
+            : null,
       };
     }),
   };
@@ -261,7 +266,7 @@ function CreateReferralCode({ defaultExpiryDays }: { defaultExpiryDays: number }
     <s-section heading="Create a referral code">
       <s-stack direction="block" gap="base">
         <s-paragraph color="subdued">
-          Give a code to a customer to share with friends. When a friend uses it on their first
+          Give a code to a customer to share with friends. When a friend uses it on a paid
           order, both earn bonus points.
         </s-paragraph>
 
@@ -474,6 +479,19 @@ export default function Referrals() {
                     <s-table-cell>
                       {c.redeemedBy ? (
                         <s-link href={`/app/customers/${c.redeemedBy.id}`}>{c.redeemedBy.label}</s-link>
+                      ) : c.lastRejection ? (
+                        <s-text tone="caution">
+                          Not applied
+                          {c.lastRejection.orderId ? (
+                            <>
+                              {" to "}
+                              <s-link href={`shopify://admin/orders/${c.lastRejection.orderId}`} target="_blank">
+                                this order
+                              </s-link>
+                            </>
+                          ) : null}
+                          : {c.lastRejection.reason}
+                        </s-text>
                       ) : (
                         "—"
                       )}
@@ -534,7 +552,7 @@ export default function Referrals() {
             The referrer earns <s-text type="strong">{settings.referrerBonusPoints.toLocaleString()} points</s-text>{" "}
             and their friend earns{" "}
             <s-text type="strong">{settings.refereeBonusPoints.toLocaleString()} points</s-text> when the
-            friend's first paid order uses the code.
+            friend's paid order uses the code.
           </s-paragraph>
           <s-paragraph>Customers enter a code in either place:</s-paragraph>
           <s-unordered-list>
@@ -547,8 +565,9 @@ export default function Referrals() {
             </s-list-item>
           </s-unordered-list>
           <s-paragraph color="subdued">
-            Each customer can use one referral code, and not their own. Customers can also get
-            their own code from the rewards widget or their account page.
+            Each customer can be referred once, and can't use their own code. If a code isn't
+            applied to an order, the reason shows next to it below. Customers can also get their
+            own code from the rewards widget or their account page.
           </s-paragraph>
           <s-link href="/app/settings">Change bonus amounts and expiry</s-link>
         </s-stack>

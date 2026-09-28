@@ -12,6 +12,7 @@ import {
   lastPurchaseActivity,
   normalizeReferralCode,
   previewRedemption,
+  recordReferralRejection,
   RedemptionError,
   redeemReferralCode,
   ReferralError,
@@ -341,8 +342,13 @@ describe("referral codes", () => {
     await expect(checkReferralCode({ shop, code: " owned " })).resolves.toEqual({ code: "OWNED", refereeBonusPoints: 250 });
     await expect(checkReferralCode({ shop, code: "OWNED", refereeShopifyCustomerId: "never-seen" })).resolves.toBeTruthy();
 
+    // A returning customer can be referred by default…
     await makeCustomer({ shopifyCustomerId: B, lifetimeOrders: 1 });
+    await expect(checkReferralCode({ shop, code: "OWNED", refereeShopifyCustomerId: B })).resolves.toBeTruthy();
+    // …unless the shop only accepts codes on a first order.
+    await prisma.shopSettings.update({ where: { shop }, data: { referralFirstOrderOnly: true } });
     await expect(checkReferralCode({ shop, code: "OWNED", refereeShopifyCustomerId: B })).rejects.toThrow("first order");
+    await prisma.shopSettings.update({ where: { shop }, data: { referralFirstOrderOnly: false } });
 
     await prisma.referralCode.update({ where: { shop_code: { shop, code: "OWNED" } }, data: { status: "REVOKED" } });
     await expect(checkReferralCode({ shop, code: "OWNED" })).rejects.toThrow("no longer active");
@@ -375,6 +381,26 @@ describe("referral codes", () => {
     expect(events).toEqual(expect.arrayContaining(["Habit: Referral Sent", "Habit: Referral Welcome Bonus"]));
   });
 
+  test("by default a returning customer can be referred, once", async () => {
+    await createReferralCode(shop, A, { code: "WELCOMEBACK", createdByMerchant: true });
+    await createReferralCode(shop, A, { code: "SECONDTRY", createdByMerchant: true });
+    await awardPointsForOrder({ shop, orderId: "old", shopifyCustomerId: B, subtotalAmount: 100 });
+    await awardPointsForOrder({ shop, orderId: "new", shopifyCustomerId: B, subtotalAmount: 50 });
+    await redeemReferralCode({ shop, code: "WELCOMEBACK", refereeShopifyCustomerId: B, orderId: "new" });
+    expect((await member(B)).pointsBalance).toBe(150 + 250);
+    expect((await member(A)).pointsBalance).toBe(500);
+    await expect(redeemReferralCode({ shop, code: "SECONDTRY", refereeShopifyCustomerId: B })).rejects.toThrow("already been used");
+  });
+
+  test("recordReferralRejection notes why a code wasn't applied", async () => {
+    await createReferralCode(shop, A, { code: "NOTED", createdByMerchant: true });
+    await recordReferralRejection({ shop, code: " noted ", orderId: "o9", reason: "You can't refer yourself." });
+    await recordReferralRejection({ shop, code: "UNKNOWN", orderId: "o9", reason: "x" });
+    const code = await prisma.referralCode.findUniqueOrThrow({ where: { shop_code: { shop, code: "NOTED" } } });
+    expect(code).toMatchObject({ lastRejectedReason: "You can't refer yourself.", lastRejectedOrderId: "o9", status: "ACTIVE" });
+    expect(code.lastRejectedAt).not.toBeNull();
+  });
+
   test("redeeming the same code twice at once pays once", async () => {
     await createReferralCode(shop, A, { code: "FRIEND", createdByMerchant: true });
     await awardPointsForOrder({ shop, orderId: "1", shopifyCustomerId: B, subtotalAmount: 10 });
@@ -386,7 +412,7 @@ describe("referral codes", () => {
     expect((await member(A)).pointsBalance).toBe(500);
   });
 
-  test("redeeming rejects unknown, inactive, expired, self, repeat, and non-first-order use", async () => {
+  test("redeeming rejects unknown, inactive, expired, self, repeat, and (when enabled) non-first-order use", async () => {
     await expect(redeemReferralCode({ shop, code: "NOPE", refereeShopifyCustomerId: B })).rejects.toThrow("not found");
 
     await createReferralCode(shop, A, { code: "PAUSED", createdByMerchant: true });
@@ -402,7 +428,9 @@ describe("referral codes", () => {
     await expect(redeemReferralCode({ shop, code: "MINE", refereeShopifyCustomerId: A })).rejects.toThrow("refer yourself");
 
     await makeCustomer({ shopifyCustomerId: "repeat", lifetimeOrders: 2 });
+    await prisma.shopSettings.update({ where: { shop }, data: { referralFirstOrderOnly: true } });
     await expect(redeemReferralCode({ shop, code: "MINE", refereeShopifyCustomerId: "repeat" })).rejects.toThrow("first order");
+    await prisma.shopSettings.update({ where: { shop }, data: { referralFirstOrderOnly: false } });
 
     await awardPointsForOrder({ shop, orderId: "b1", shopifyCustomerId: B, subtotalAmount: 10 });
     await redeemReferralCode({ shop, code: "MINE", refereeShopifyCustomerId: B, orderId: "b1" });

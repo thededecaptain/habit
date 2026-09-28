@@ -137,6 +137,45 @@ describe("orders/paid", () => {
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("referral code NOPE not applied"));
   });
 
+  test("a refused code records why on the code, for the Referrals page", async () => {
+    await makeCustomer({ shopifyCustomerId: "555" });
+    await createReferralCode(shop, "555", { code: "MINE", createdByMerchant: true });
+    webhookContext("ORDERS_PAID", order({ note_attributes: [{ name: "referral_code", value: "MINE" }] }));
+    await call(ordersPaid.action, request());
+    const code = await prisma.referralCode.findUniqueOrThrow({ where: { shop_code: { shop, code: "MINE" } } });
+    expect(code).toMatchObject({ status: "ACTIVE", lastRejectedReason: "You can't refer yourself.", lastRejectedOrderId: "1001" });
+  });
+
+  test("review regression: a returning tester account, guest checkout, valid code", async () => {
+    // app.tester11 had ordered before (in an earlier review round), then
+    // checked out as a guest with a code: both sides must get their bonus,
+    // the code must be marked used, and both balances must reach checkout.
+    const accountApi = await import("../../app/routes/account-api.points");
+    await makeCustomer({ shopifyCustomerId: "referrer", email: "app.tester55@shopify.com" });
+    await createReferralCode(shop, "referrer", { code: "SHOPIFYTEST", createdByMerchant: true });
+    webhookContext("ORDERS_PAID", order({ id: 1, current_subtotal_price: "245.00" }));
+    await call(ordersPaid.action, request());
+    webhookContext("ORDERS_PAID", order({ id: 2, current_subtotal_price: "15.00", note_attributes: [{ name: "referral_code", value: "SHOPIFYTEST" }] }));
+    await call(ordersPaid.action, request());
+
+    const buyer = await member("555");
+    expect(buyer.pointsBalance).toBe(245 + 15 + 250);
+    expect(buyer.syncedPointsBalance).toBe(510);
+    expect((await member("referrer")).pointsBalance).toBe(500);
+    expect((await member("referrer")).syncedPointsBalance).toBe(500);
+    const code = await prisma.referralCode.findUniqueOrThrow({ where: { shop_code: { shop, code: "SHOPIFYTEST" } } });
+    expect(code.status).toBe("REDEEMED");
+
+    // What the customer sees in their account.
+    shopify.sessionSub = "gid://shopify/Customer/555";
+    const card = await (await call(accountApi.loader, new Request("https://habit.test/account-api/points"))).value.json();
+    expect(card.pointsBalance).toBe(510);
+    expect(card.history.map((h: { type: string; points: number }) => [h.type, h.points])).toContainEqual(["REFERRAL_BONUS", 250]);
+    shopify.sessionSub = "gid://shopify/Customer/referrer";
+    const referrerCard = await (await call(accountApi.loader, new Request("https://habit.test/account-api/points"))).value.json();
+    expect(referrerCard.history.map((h: { type: string; points: number }) => [h.type, h.points])).toContainEqual(["REFERRAL_BONUS", 500]);
+  });
+
   test("an unexpected referral failure fails the webhook so Shopify retries", async () => {
     await makeCustomer({ shopifyCustomerId: "owner" });
     await createReferralCode(shop, "owner", { code: "FRIEND", createdByMerchant: true });

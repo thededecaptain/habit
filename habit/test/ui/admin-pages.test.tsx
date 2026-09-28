@@ -206,6 +206,7 @@ describe("settings", () => {
     pointsPerDollar: "1", redemptionRate: "100", minRedeemablePoints: "100", maxRedemptionPercent: "50",
     referrerBonusPoints: "500", refereeBonusPoints: "250", referralCodeExpiryDays: "30", maxActiveReferralCodesPerCustomer: "5",
     referralVelocityThreshold: "50", referralVelocityWindowMinutes: "60", pointsExpiryDays: "", notificationWebhookUrl: "",
+    referralFirstOrderOnly: "false",
   };
   const data = { values, amount: 49, trialDays: 30, billingUnavailable: false, subscription: { source: "billing-api", status: "ACTIVE", inTrial: true, trialEndsAt: "2026-10-20T00:00:00Z", currentPeriodEnd: null } };
 
@@ -240,6 +241,21 @@ describe("settings", () => {
     }
     fireEvent.click([...container.querySelectorAll("ui-save-bar button")].find((b) => b.textContent?.trim() === "Save")!);
     await vi.waitFor(() => expect(actions[0]).toMatchObject({ notificationWebhookUrl: "https://hooks.example.com", pointsExpiryDays: "7", referralVelocityWindowMinutes: "7" }));
+  });
+
+  test("the first-order-only checkbox is off by default and saves when toggled", async () => {
+    const { container, actions } = await renderRoute(Settings, { path: "/app/settings", loaderData: data, action: () => ({ errors: null }) });
+    await flush();
+    const checkbox = el(container, "s-checkbox") as HTMLElement & { checked?: boolean };
+    expect(checkbox.hasAttribute("checked")).toBe(false);
+    checkbox.checked = true;
+    fireEvent(checkbox, new Event("change"));
+    fireEvent.click([...container.querySelectorAll("ui-save-bar button")].find((b) => b.textContent?.trim() === "Save")!);
+    await vi.waitFor(() => expect(actions[0]).toMatchObject({ referralFirstOrderOnly: "true" }));
+
+    const { container: on } = await renderRoute(Settings, { path: "/app/settings", loaderData: { ...data, values: { ...values, referralFirstOrderOnly: "true" } } });
+    await flush();
+    expect(el(on, "s-checkbox").hasAttribute("checked")).toBe(true);
   });
 
   test("cancelling the subscription submits the cancel intent", async () => {

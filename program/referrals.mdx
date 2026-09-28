@@ -11,7 +11,7 @@ In **Settings**, configure:
 
 | Setting | What it controls |
 |---|---|
-| Bonus points for the referrer | Points the existing customer earns when a friend’s first paid order converts |
+| Bonus points for the referrer | Points the existing customer earns when a friend’s paid order uses their code |
 | Bonus points for the new customer | Welcome points for the new customer |
 | Referral code expiry (days) | How long an unused code stays valid |
 | Max active referral codes per member | Cap on unused codes one customer can generate |
@@ -37,12 +37,12 @@ The top of the page shows active codes, successful referrals, and total bonus po
   <Step title="Apply it">
     The new customer enters the code under **Have a referral code?** in the cart (every plan, guests included; needs the **Redeem points in cart** app embed) or, on Shopify Plus, at checkout. The code is checked when they apply it.
   </Step>
-  <Step title="First paid order">
-    When that customer’s first paid order goes through, Habit credits both bonuses. Codes only work on a customer’s first order, each customer can use one referral code, and self-referrals are rejected. If that order is later fully refunded, both bonuses are reversed.
+  <Step title="Paid order">
+    When that customer’s paid order goes through, Habit credits both bonuses and marks the code used. Each customer can be referred once, and self-referrals are rejected. To only accept codes on a customer’s very first order, turn on **Only accept referral codes on a customer’s first order** in Settings. If the order is later fully refunded, both bonuses are reversed.
   </Step>
 </Steps>
 
-Invalid, expired, or already-used codes are ignored at order time. The customer sees the error when they try to apply the code.
+Invalid, expired, or already-used codes don't apply. The customer sees why when they apply the code, and if a code is refused on an order anyway (for example, a guest checks out with the referrer's own email), the **Referrals** page shows the reason next to the code.
 
 The referral field is separate from Shopify's discount code box. A referral code gives bonus points, not a discount, so entering it in the discount box won't work.
 

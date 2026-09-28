@@ -4,6 +4,7 @@ import {
   awardPointsForOrder,
   finalizeRedemptionForOrder,
   getOrCreateShopSettings,
+  recordReferralRejection,
   redeemReferralCode,
   ReferralError,
 } from "../lib/ledger.server";
@@ -97,6 +98,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       // customer already sees an explanation client-side if it's rejected.
       if (!(error instanceof ReferralError)) throw error;
       console.warn(`Order ${orderId}: referral code ${referralCode} not applied — ${error.message}`);
+      // Shown on the Referrals page, so a code that didn't pay out is never
+      // a silent failure for the merchant.
+      await recordReferralRejection({ shop, code: referralCode, orderId, reason: error.message });
     }
   }
 

@@ -228,7 +228,7 @@ describe("settings", () => {
   test("loads current values and the subscription", async () => {
     paid();
     const { value } = await call(settingsRoute.loader, get("/app/settings"));
-    expect(value.values).toMatchObject({ pointsPerDollar: "1", redemptionRate: "100", pointsExpiryDays: "", notificationWebhookUrl: "" });
+    expect(value.values).toMatchObject({ pointsPerDollar: "1", redemptionRate: "100", pointsExpiryDays: "", notificationWebhookUrl: "", referralFirstOrderOnly: "false" });
     expect(value.subscription).toMatchObject({ source: "billing-api", inTrial: true });
     expect(value.billingUnavailable).toBe(false);
   });
@@ -247,6 +247,10 @@ describe("settings", () => {
     expect(value.errors).toBeNull();
     const saved = await prisma.shopSettings.findUniqueOrThrow({ where: { shop } });
     expect(Number(saved.pointsPerDollar)).toBe(2);
+    expect(saved.referralFirstOrderOnly).toBe(false);
+    await call(settingsRoute.action, post("/app/settings", { ...valid, referralFirstOrderOnly: "true" }));
+    expect((await prisma.shopSettings.findUniqueOrThrow({ where: { shop } })).referralFirstOrderOnly).toBe(true);
+    expect((await call(settingsRoute.loader, get("/app/settings"))).value.values.referralFirstOrderOnly).toBe("true");
     expect(saved.pointsExpiryDays).toBe(365);
     const metafield = (shopify.admin.callsTo("SetLoyaltySettings")[0]?.variables?.metafields as { value: string }[])[0]!;
     expect(JSON.parse(metafield.value)).toMatchObject({ pointsPerDollar: 2, redemptionRate: 50, maxRedemptionPercent: 40 });
@@ -332,6 +336,17 @@ describe("referrals page", () => {
     expect(await codesFor("q=olivia&status=active")).toEqual(["ACTIVE1"]);
     expect(await codesFor("q=used")).toEqual(["USED1"]);
     expect((await call(referrals.loader, get("/app/referrals?page=0"))).value.page).toBe(1);
+  });
+
+  test("shows why an unused code was refused, but not once it's been used", async () => {
+    await makeCustomer({ shopifyCustomerId: "owner" });
+    const refused = await createReferralCode(shop, "owner", { code: "REFUSED", createdByMerchant: true });
+    await prisma.referralCode.update({ where: { id: refused.id }, data: { lastRejectedReason: "You can't refer yourself.", lastRejectedOrderId: "77", lastRejectedAt: new Date() } });
+    const later = await createReferralCode(shop, "owner", { code: "LATERUSED", createdByMerchant: true });
+    await prisma.referralCode.update({ where: { id: later.id }, data: { status: "REDEEMED", lastRejectedReason: "old", lastRejectedAt: new Date() } });
+    const codes = (await call(referrals.loader, get("/app/referrals"))).value.codes;
+    expect(codes.find((c: { code: string }) => c.code === "REFUSED").lastRejection).toEqual({ reason: "You can't refer yourself.", orderId: "77" });
+    expect(codes.find((c: { code: string }) => c.code === "LATERUSED").lastRejection).toBeNull();
   });
 
   test("labels an owner with no name or email by customer id", async () => {

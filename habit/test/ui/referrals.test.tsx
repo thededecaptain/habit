@@ -134,6 +134,16 @@ describe("Referrals page", () => {
     await vi.advanceTimersByTimeAsync(350);
   });
 
+  test("an unused code that was refused on an order says why", async () => {
+    const refused = { ...loaderData.codes[0], lastRejection: { reason: "You can't refer yourself.", orderId: "13887998361656" } };
+    const noOrder = { ...loaderData.codes[0], id: "c3", code: "NOORDER", lastRejection: { reason: "This referral code has expired.", orderId: null } };
+    const { container } = await renderRoute(Referrals, { path: "/app/referrals", loaderData: { ...loaderData, codes: [refused, noOrder] }, extraRoutes: [searchRoute] });
+    await screen.findByText("NOORDER");
+    expect(container.textContent).toContain("Not applied to this order: You can't refer yourself.");
+    expect(el(container, 's-link[href="shopify://admin/orders/13887998361656"]')).toBeTruthy();
+    expect(container.textContent).toContain("Not applied: This referral code has expired.");
+  });
+
   test("empty states", async () => {
     await renderRoute(Referrals, { path: "/app/referrals", loaderData: { ...loaderData, codes: [] }, extraRoutes: [searchRoute] });
     expect(await screen.findByText(/No referral codes yet/)).toBeTruthy();

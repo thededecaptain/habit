@@ -20,6 +20,7 @@ import {
 } from "../lib/billing.server";
 import { docsHref } from "../lib/brand";
 import { SupportFooter } from "../components/support-footer";
+import { useElementEvent } from "../components/use-element-event";
 
 const LOYALTY_EVENT_NAMES = [
   "Points earned",
@@ -74,6 +75,7 @@ type FormState = {
   refereeBonusPoints: string;
   referralCodeExpiryDays: string;
   maxActiveReferralCodesPerCustomer: string;
+  referralFirstOrderOnly: string;
   referralVelocityThreshold: string;
   referralVelocityWindowMinutes: string;
   pointsExpiryDays: string;
@@ -106,6 +108,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     maxActiveReferralCodesPerCustomer: formatSettingNumber(
       settings.maxActiveReferralCodesPerCustomer,
     ),
+    referralFirstOrderOnly: settings.referralFirstOrderOnly ? "true" : "false",
     referralVelocityThreshold: formatSettingNumber(settings.referralVelocityThreshold),
     referralVelocityWindowMinutes: formatSettingNumber(
       settings.referralVelocityWindowMinutes,
@@ -294,6 +297,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         refereeBonusPoints: fields.refereeBonusPoints.value,
         referralCodeExpiryDays: fields.referralCodeExpiryDays.value,
         maxActiveReferralCodesPerCustomer: fields.maxActiveReferralCodesPerCustomer.value,
+        referralFirstOrderOnly: formData.get("referralFirstOrderOnly") === "true",
         referralVelocityThreshold: fields.referralVelocityThreshold.value,
         referralVelocityWindowMinutes: fields.referralVelocityWindowMinutes.value,
         pointsExpiryDays: fields.pointsExpiryDays.value,
@@ -385,6 +389,13 @@ export default function Settings() {
     setForm((prev) => ({ ...prev, [key]: fieldInputValue(event) }));
     setEditedSinceSubmit((prev) => new Set(prev).add(key));
   };
+
+  // A checkbox's toggle arrives as a "change" event, which React 18 doesn't
+  // deliver to props on web components; listen on the element instead.
+  const firstOrderOnlyRef = useElementEvent("change", (event) => {
+    const checked = Boolean((event.currentTarget as { checked?: boolean } | null)?.checked);
+    setForm((prev) => ({ ...prev, referralFirstOrderOnly: checked ? "true" : "false" }));
+  });
 
   const handleSave = () => {
     setEditedSinceSubmit(new Set());
@@ -608,6 +619,13 @@ export default function Settings() {
             min={1}
             step={1}
             details="Basic fraud protection: caps how many unused codes a member can generate."
+          />
+          <s-checkbox
+            key={`first-order-${resetKey}`}
+            ref={firstOrderOnlyRef}
+            label="Only accept referral codes on a customer's first order"
+            checked={fieldDefaults.referralFirstOrderOnly === "true" || undefined}
+            details="Off: any customer can be referred once, even if they've ordered before. On: returning customers can't use a referral code."
           />
           <StableNumberField
             resetToken={resetKey}
